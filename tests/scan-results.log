@@ -1,0 +1,23 @@
+--------Results--------
+
+-------Findings------
+Total Findings......: 266
+
+--------Files--------
+Total Files.........: 2641
+Files Scanned.......: 608
+Files Ignored.......: 2033
+Files Dirty.........: 45
+
+---------SCM---------
+Repos Found.........: 191
+Repos Cloned........: 1
+Repos Scanned.......: 1
+Commits Total.......: 1933
+Commits Scanned.....: 1933
+Commits Dirty.......: 38
+
+-------General-------
+App Version.........: 0.1.0
+Signatures Version..: 0.0.2
+Elapsed Time........: 20.924152927s
