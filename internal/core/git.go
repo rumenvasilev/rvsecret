@@ -33,13 +33,15 @@ type GithubRepository struct {
 }
 
 // CloneConfiguration holds the configurations for cloning a repo
-type CloneConfiguration struct {
-	InMemClone bool
+type CloneConfiguration struct { // Alignement of the struct is memory optimized
 	URL        string
 	Username   string
 	Token      string
 	Branch     string
+	TagMode    git.TagMode
 	Depth      int
+	InMemClone bool
+	Tag        bool
 }
 
 // EmptyTreeCommit is a dummy commit id used as a placeholder and for testing
@@ -158,20 +160,20 @@ func GetChangeContent(change *object.Change) (result string, contentError error)
 
 // InitGitClient will create a new git client of the type given by the input string.
 func (s *Session) InitGitClient() error {
-	switch s.Config.ScanType {
-	case api.Github, api.GithubEnterprise:
-		client, err := _github.NewClient(s.Config.GithubAccessToken, "", s.Out)
+	switch s.Config.Global.ScanType {
+	case api.Github:
+		client, err := _github.NewClient(s.Config.Github.APIToken, "", s.Out)
 		if err != nil {
 			return err
 		}
-		if s.Config.ScanType == api.GithubEnterprise {
-			if s.Config.GithubEnterpriseURL == "" {
-				return fmt.Errorf("github enterprise URL is missing")
-			}
-			client, err = _github.NewClient(s.Config.GithubAccessToken, s.Config.GithubEnterpriseURL, s.Out)
-			if err != nil {
-				return err
-			}
+		s.Client = client
+	case api.GithubEnterprise:
+		if s.Config.Github.GithubEnterpriseURL == "" {
+			return fmt.Errorf("github enterprise URL is missing")
+		}
+		client, err := _github.NewClient(s.Config.Github.APIToken, s.Config.Github.GithubEnterpriseURL, s.Out)
+		if err != nil {
+			return err
 		}
 		s.Client = client
 	case api.Gitlab:
@@ -182,6 +184,14 @@ func (s *Session) InitGitClient() error {
 		// TODO need to add in the bits to parse the url here as well
 		// TODO set this to some sort of consistent client, look to github for ideas
 		s.Client = client
+	case api.UpdateSignatures:
+		client, err := _github.NewClient(s.Config.Signatures.APIToken, "", s.Out)
+		if err != nil {
+			return err
+		}
+		s.Client = client
+	default:
+		return fmt.Errorf("unknown scan type provided")
 	}
 	return nil
 }
@@ -204,25 +214,25 @@ func cloneRepository(sess *Session, repo _coreapi.Repository) (*git.Repository, 
 }
 
 func cloneRepositoryFunc(sess *Session, repo _coreapi.Repository) (*git.Repository, string, error) {
-	var cloneConfig = CloneConfiguration{}
+	var cloneConfig CloneConfiguration
 	var auth = http.BasicAuth{}
-	switch sess.Config.ScanType {
+	switch sess.Config.Global.ScanType {
 	case api.Github, api.GithubEnterprise:
 		cloneConfig = CloneConfiguration{
 			URL:        repo.CloneURL,
 			Branch:     repo.DefaultBranch,
-			Depth:      sess.Config.CommitDepth,
-			InMemClone: sess.Config.InMemClone,
-			// Token:      sess.GithubAccessToken,
+			Depth:      sess.Config.Global.CommitDepth,
+			InMemClone: sess.Config.Global.InMemClone,
 		}
 		auth.Username = "doesn't matter"
-		auth.Password = sess.Config.GithubAccessToken
+		auth.Password = sess.Config.Github.APIToken
+	// case api.UpdateSignatures: This is handled through a different path
 	case api.Gitlab:
 		cloneConfig = CloneConfiguration{
 			URL:        repo.CloneURL,
 			Branch:     repo.DefaultBranch,
-			Depth:      sess.Config.CommitDepth,
-			InMemClone: sess.Config.InMemClone,
+			Depth:      sess.Config.Global.CommitDepth,
+			InMemClone: sess.Config.Global.InMemClone,
 			// Token:      , // TODO Is this need since we already have a client?
 		}
 		auth.Username = "oauth2"
@@ -231,25 +241,35 @@ func cloneRepositoryFunc(sess *Session, repo _coreapi.Repository) (*git.Reposito
 		cloneConfig = CloneConfiguration{
 			URL:        repo.CloneURL,
 			Branch:     repo.DefaultBranch,
-			Depth:      sess.Config.CommitDepth,
-			InMemClone: sess.Config.InMemClone,
+			Depth:      sess.Config.Global.CommitDepth,
+			InMemClone: sess.Config.Global.InMemClone,
 		}
+	default:
+		return nil, "", fmt.Errorf("unsupported scantype")
 	}
-	return cloneRepositoryGeneric(cloneConfig, &auth)
+	return CloneRepositoryGeneric(cloneConfig, &auth)
 }
 
 // cloneRepositoryGeneric will create either an in memory clone of a given repository or clone to a temp dir.
-func cloneRepositoryGeneric(config CloneConfiguration, auth *http.BasicAuth) (repo *git.Repository, dir string, err error) {
+func CloneRepositoryGeneric(config CloneConfiguration, auth *http.BasicAuth) (repo *git.Repository, dir string, err error) {
+	ref := plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", config.Branch))
+	if config.Tag {
+		ref = plumbing.ReferenceName(fmt.Sprintf("refs/tags/%s", config.Branch))
+	}
 	cloneOptions := &git.CloneOptions{
 		URL:           config.URL,
 		Depth:         config.Depth,
-		ReferenceName: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", config.Branch)),
+		ReferenceName: ref,
 		SingleBranch:  true,
-		Tags:          git.NoTags,
+		Tags:          config.TagMode,
 	}
 
 	if auth != nil {
 		cloneOptions.Auth = auth
+	}
+
+	if config.TagMode == git.InvalidTagMode {
+		cloneOptions.Tags = git.NoTags
 	}
 
 	if !config.InMemClone {

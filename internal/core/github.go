@@ -68,26 +68,26 @@ func (s *Session) ValidateUserInput() error {
 	// if s.ScanType == api.GithubEnterprise {
 
 	// If no targets are given, fail fast
-	if s.Config.UserDirtyRepos == nil && s.Config.UserDirtyOrgs == nil && s.Config.UserDirtyNames == nil {
+	if s.Config.Github.UserDirtyRepos == nil && s.Config.Github.UserDirtyOrgs == nil && s.Config.Github.UserDirtyNames == nil {
 		return errors.New("you must enter either a user, org or repo[s] to scan")
 	}
 
 	// validate the input does not contain any scary characters
 	exp := regexp.MustCompile(`[A-Za-z0-9,-_]*$`)
 
-	for _, v := range s.Config.UserDirtyOrgs {
+	for _, v := range s.Config.Github.UserDirtyOrgs {
 		if exp.MatchString(v) {
 			s.GithubUserOrgs = append(s.GithubUserOrgs, v)
 		}
 	}
 
-	for _, v := range s.Config.UserDirtyRepos {
+	for _, v := range s.Config.Github.UserDirtyRepos {
 		if exp.MatchString(v) {
 			s.GithubUserRepos = append(s.GithubUserRepos, v)
 		}
 	}
 
-	for _, v := range s.Config.UserDirtyNames {
+	for _, v := range s.Config.Github.UserDirtyNames {
 		if exp.MatchString(v) {
 			s.GithubUserLogins = append(s.GithubUserLogins, v)
 		}
@@ -270,10 +270,10 @@ func GatherGithubOrgRepositories(sess *Session, log *log.Logger) error {
 	// Calculate the number of threads based on the flag and the number of orgs
 	// TODO: implement nice in the threading logic to guard against rate limiting and tripping the
 	//  security protections
-	threadNum := sess.Config.Threads
+	threadNum := sess.Config.Global.Threads
 	if orgsCnt <= 1 {
 		threadNum = 1
-	} else if orgsCnt <= sess.Config.Threads {
+	} else if orgsCnt <= sess.Config.Global.Threads {
 		threadNum = orgsCnt - 1
 	}
 	wg.Add(threadNum)

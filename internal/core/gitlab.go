@@ -53,7 +53,7 @@ func GatherTargets(sess *Session) {
 		sess.Out.Debug("%s (ID: %d) type: %s", *target.Login, *target.ID, *target.Type)
 		sess.AddTarget(target)
 		// If forking is false AND the target type is an Organization as set above in GetUserOrganization
-		if sess.Config.ExpandOrgs && *target.Type == _coreapi.TargetTypeOrganization {
+		if sess.Config.Global.ExpandOrgs && *target.Type == _coreapi.TargetTypeOrganization {
 			sess.Out.Debug("Gathering members of %s (ID: %d)...", *target.Login, *target.ID)
 			members, err := sess.Client.GetOrganizationMembers(ctx, *target)
 			if err != nil {
@@ -82,10 +82,10 @@ func GatherGitlabRepositories(sess *Session) {
 	var threadNum int
 	if len(sess.State.Targets) == 1 {
 		threadNum = 1
-	} else if len(sess.State.Targets) <= sess.Config.Threads {
+	} else if len(sess.State.Targets) <= sess.Config.Global.Threads {
 		threadNum = len(sess.State.Targets) - 1
 	} else {
-		threadNum = sess.Config.Threads
+		threadNum = sess.Config.Global.Threads
 	}
 	wg.Add(threadNum)
 	log.Debug("Threads for repository gathering: %d", threadNum)

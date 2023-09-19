@@ -5,15 +5,19 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fatih/structs"
 	"github.com/mitchellh/go-homedir"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/api"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 	"github.com/rumenvasilev/rvsecret/version"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+const configFile = "$HOME/.rvsecret/config.yaml"
+
 // cfg holds the configuration data the commands
-var cfg *viper.Viper
+var cfg *Config
 
 // defaultIgnoreExtensions is an array of extensions that if they match a file that file will be excluded
 var defaultIgnoreExtensions = []string{"jpg", "jpeg", "png", "gif", "bmp", "tiff",
@@ -22,61 +26,85 @@ var defaultIgnoreExtensions = []string{"jpg", "jpeg", "png", "gif", "bmp", "tiff
 // defaultIgnorePaths is an array of directories that will be excluded from all types of scans.
 var defaultIgnorePaths = []string{"node_modules/", "vendor/bundle", "vendor/cache", "/proc/"}
 
-// DefaultValues is a map of all flag default values and other mutable variables
-var defaultValues = map[string]interface{}{
-	"bind-address":       "127.0.0.1",
-	"bind-port":          9393,
-	"commit-depth":       -1,
-	"config-file":        "$HOME/.rvsecret/config.yaml",
-	"csv":                false,
-	"debug":              false,
-	"ignore-extension":   nil,
-	"ignore-path":        nil,
-	"in-mem-clone":       false,
-	"json":               false,
-	"max-file-size":      10,
-	"num-threads":        -1,
-	"local-paths":        nil,
-	"scan-forks":         false,
-	"scan-tests":         false,
-	"scan-type":          "",
-	"silent":             false,
-	"confidence-level":   3,
-	"signature-file":     "$HOME/.rvsecret/signatures/default.yaml",
-	"signature-path":     "$HOME/.rvsecret/signatures/",
-	"signatures-path":    "$HOME/.rvsecret/signatures/",
-	"signatures-url":     "https://github.com/rumenvasilev/rvsecret-signatures",
-	"signatures-version": "",
-	"scan-dir":           nil,
-	"scan-file":          nil,
-	"hide-secrets":       false,
-	"rules-url":          "",
-	"test-signatures":    false,
-	"web-server":         false,
-	// Github
-	"add-org-members":       false,
-	"github-enterprise-url": "",
-	"github-url":            "https://api.github.com",
-	"github-api-token":      "",
-	"github-orgs":           nil,
-	"github-repos":          nil,
-	"github-users":          nil,
-	// Gitlab
-	"gitlab-targets": nil,
-	//"gitlab-url":                 "", // TODO set the default
-	"gitlab-api-token": "",
+type Config struct {
+	Signatures Signatures `mapstructure:"signatures" yaml:"signatures"`
+	Github     Github     `mapstructure:"github" yaml:"github"`
+	Gitlab     `mapstructure:"gitlab" yaml:"gitlab"`
+	Global     Global `mapstructure:"global" yaml:"global"`
+	Local      Local  `mapstructure:"local" yaml:"local"`
+}
+
+type Global struct {
+	AppVersion  string       `yaml:"-"`
+	BindAddress string       `mapstructure:"bind-address" yaml:"bind-address"`
+	ConfigFile  string       `mapstructure:"config-file" yaml:"-"`
+	ScanType    api.ScanType `mapstructure:"scan-type" yaml:"-"`
+	// LocalPaths      []string     `mapstructure:"paths" yaml:"paths"`
+	SkippableExt    []string `mapstructure:"ignore-extension" yaml:"ignore-extension"`
+	SkippablePath   []string `mapstructure:"ignore-path" yaml:"ignore-path"`
+	BindPort        int      `mapstructure:"bind-port" yaml:"bind-port"`
+	CommitDepth     int      `mapstructure:"commit-depth" yaml:"commit-depth"`
+	ConfidenceLevel int      `mapstructure:"confidence-level" yaml:"confidence-level"`
+	MaxFileSize     int64    `mapstructure:"max-file-size" yaml:"max-file-size"`
+	Threads         int      `mapstructure:"num-threads" yaml:"num-threads"`
+	CSVOutput       bool     `mapstructure:"csv"`
+	Debug           bool     `mapstructure:"debug"`
+	ExpandOrgs      bool     `mapstructure:"expand-orgs" yaml:"expand-orgs"`
+	HideSecrets     bool     `mapstructure:"hide-secrets" yaml:"hide-secrets"`
+	InMemClone      bool     `mapstructure:"in-mem-clone" yaml:"in-mem-clone"`
+	JSONOutput      bool     `mapstructure:"json"`
+	ScanFork        bool     `mapstructure:"scan-forks" yaml:"scan-forks"`
+	ScanTests       bool     `mapstructure:"scan-tests" yaml:"scan-tests"`
+	Silent          bool     `mapstructure:"silent"`
+	WebServer       bool     `mapstructure:"web-server" yaml:"web-server"`
+	_               [6]byte
+}
+
+type Signatures struct {
+	APIToken string `mapstructure:"api-token" yaml:"api-token"`
+	File     string `mapstructure:"file"`
+	Path     string `mapstructure:"path"`
+	URL      string `mapstructure:"url"`
+	UserRepo string `mapstructure:"user-repo" yaml:"user-repo"`
+	Version  string `mapstructure:"version"`
+	Test     bool   `mapstructure:"test"`
+	_        [31]byte
+}
+
+type Github struct {
+	APIToken            string   `mapstructure:"api-token" yaml:"api-token"`
+	GithubURL           string   `mapstructure:"url" yaml:"url"`
+	GithubEnterpriseURL string   `mapstructure:"enterprise-url" yaml:"enterprise-url"`
+	UserDirtyNames      []string `mapstructure:"users" yaml:"users"`
+	UserDirtyOrgs       []string `mapstructure:"orgs" yaml:"orgs"`
+	UserDirtyRepos      []string `mapstructure:"repos" yaml:"repos"`
+	Enterprise          bool     `mapstructure:"enterprise"`
+	_                   [7]byte
+}
+
+type Gitlab struct {
+	GitlabAccessToken string   `mapstructure:"gitlab-api-token"`
+	GitlabTargets     []string `mapstructure:"gitlab-targets"`
+	_                 [24]byte
+}
+
+type Local struct {
+	Paths []string `mapstructure:"paths"`
+	Repos []string `mapstructure:"repos"`
+	_     [16]byte
 }
 
 // SetConfig will set the defaults, and load a config file and environment variables if they are present
-func SetConfig() {
-	for key, value := range defaultValues {
+func SetConfig(cmd *cobra.Command) {
+	// Set defaults
+	for key, value := range structs.Map(DefaultConfig) {
 		viper.SetDefault(key, value)
 	}
 
-	configFile := viper.GetString("config-file")
-
-	if configFile != defaultValues["config-file"] {
-		viper.SetConfigFile(configFile)
+	// Read from config
+	cf := viper.GetString("config-file")
+	if cf != "" && cf != configFile {
+		viper.SetConfigFile(cf)
 	} else {
 		home, err := homedir.Dir()
 		if err != nil {
@@ -89,113 +117,81 @@ func SetConfig() {
 		viper.SetConfigType("yaml")
 	}
 
-	if err := viper.ReadInConfig(); err != nil {
-		fmt.Println("Couldn't load Viper config.", err)
-		// os.Exit(1)
+	// Load config into mapstructure
+	err := viper.ReadInConfig() //nolint:errcheck
+	if err != nil {
+		fmt.Printf("Couldn't load config file; proceeding with defaults and CLI overrides, %v\n", err)
 	}
-
 	viper.AutomaticEnv()
 
-	cfg = viper.GetViper()
-}
+	// Load mapstructure config into our config struct
+	var c *Config
+	err = viper.Unmarshal(&c)
+	if err != nil {
+		fmt.Println("Failed unmarshaling config to struct")
+		os.Exit(1)
+	}
 
-type Config struct {
-	AppVersion          string
-	BindAddress         string
-	BindPort            int
-	CommitDepth         int
-	ConfidenceLevel     int
-	CSVOutput           bool
-	Debug               bool
-	ExpandOrgs          bool
-	GithubAccessToken   string
-	GithubEnterpriseURL string
-	GitlabAccessToken   string
-	GitlabTargets       []string
-	GitlabURL           string
-	HideSecrets         bool
-	InMemClone          bool
-	JSONOutput          bool
-	LocalPaths          []string
-	MaxFileSize         int64
-	ScanFork            bool
-	ScanTests           bool
-	ScanType            api.ScanType
-	Silent              bool
-	SkippableExt        []string
-	SkippablePath       []string
-	SignatureFiles      []string
-	Threads             int
-	UserDirtyNames      []string
-	UserDirtyOrgs       []string
-	UserDirtyRepos      []string
-	WebServer           bool
+	c.Global.SkippablePath = util.AppendToSlice(true, defaultIgnorePaths, c.Global.SkippablePath)
+	// add any additional paths the user requested to exclude to the pre-defined slice
+	// c.SkippablePath = util.AppendToSlice(true, viper.GetStringSlice("ignore-path"), c.SkippablePath)
+
+	// the default ignorable extensions
+	c.Global.SkippableExt = util.AppendToSlice(false, defaultIgnoreExtensions, c.Global.SkippableExt)
+	// add any additional extensions the user requested to ignore
+	// c.SkippableExt = util.AppendToSlice(true, viper.GetStringSlice("ignore-extension"), c.SkippableExt)
+
+	c.Global.CommitDepth = setCommitDepth(c.Global.CommitDepth)
+
+	c.Global.AppVersion = version.AppVersion()
+	cfg = c
 }
 
 // TODO detect scanType automatically
 func Load(scanType api.ScanType) (*Config, error) {
-	c := Config{
-		BindAddress:     cfg.GetString("bind-address"),
-		BindPort:        cfg.GetInt("bind-port"),
-		CommitDepth:     setCommitDepth(cfg.GetFloat64("commit-depth")),
-		CSVOutput:       cfg.GetBool("csv"),
-		Debug:           cfg.GetBool("debug"),
-		ExpandOrgs:      cfg.GetBool("expand-orgs"),
-		HideSecrets:     cfg.GetBool("hide-secrets"),
-		InMemClone:      cfg.GetBool("in-mem-clone"),
-		JSONOutput:      cfg.GetBool("json"),
-		MaxFileSize:     cfg.GetInt64("max-file-size"),
-		ConfidenceLevel: cfg.GetInt("confidence-level"),
-		ScanFork:        cfg.GetBool("scan-forks"),
-		ScanTests:       cfg.GetBool("scan-tests"),
-		ScanType:        scanType,
-		Silent:          cfg.GetBool("silent"),
-		SignatureFiles:  cfg.GetStringSlice("signature-file"),
-		Threads:         cfg.GetInt("num-threads"),
-		AppVersion:      version.AppVersion(),
-		WebServer:       cfg.GetBool("web-server"),
-	}
+	// set configuration
+	cfg.Global.ScanType = scanType
 
 	switch scanType {
-	case api.LocalGit:
-		c.LocalPaths = cfg.GetStringSlice("local-repos")
-	case api.LocalPath:
-		c.LocalPaths = cfg.GetStringSlice("paths")
-	case api.Gitlab:
-		c.GitlabAccessToken = cfg.GetString("gitlab-api-token")
-		c.GitlabTargets = cfg.GetStringSlice("gitlab-targets")
-	case api.Github, api.GithubEnterprise:
-		c.GithubAccessToken = cfg.GetString("github-api-token")
-		c.UserDirtyRepos = cfg.GetStringSlice("github-repos")
-		c.UserDirtyOrgs = cfg.GetStringSlice("github-orgs")
-		c.UserDirtyNames = cfg.GetStringSlice("github-users")
-		if scanType == api.GithubEnterprise {
-			c.GithubEnterpriseURL = cfg.GetString("github-enterprise-url")
-			if c.GithubEnterpriseURL == "" {
-				return nil, errors.New("Github enterprise URL is not set.")
-			}
+	case api.Github:
+		if cfg.Github.APIToken == "" {
+			return nil, errors.New("APIToken for Github is not set")
+		}
+	case api.GithubEnterprise:
+		if cfg.Github.GithubEnterpriseURL == "" {
+			return nil, errors.New("Github enterprise URL is not set.")
+		}
+	case api.UpdateSignatures:
+		if cfg.Signatures.APIToken == "" {
+			return nil, errors.New("APIToken for Github is not set")
 		}
 	}
-
-	// Add the default directories to the sess if they don't already exist
-	c.SkippablePath = util.AppendToSlice(true, defaultIgnorePaths, c.SkippablePath)
-	// add any additional paths the user requested to exclude to the pre-defined slice
-	c.SkippablePath = util.AppendToSlice(true, cfg.GetStringSlice("ignore-path"), c.SkippablePath)
-
-	// the default ignorable extensions
-	c.SkippableExt = util.AppendToSlice(false, defaultIgnoreExtensions, c.SkippableExt)
-	// add any additional extensions the user requested to ignore
-	c.SkippableExt = util.AppendToSlice(true, cfg.GetStringSlice("ignore-extension"), c.SkippableExt)
-
-	return &c, nil
+	return cfg, nil
 }
 
 // setCommitDepth will set the commit depth for the current session. This is an ugly way of doing it
 // but for the moment it works fine.
 // TODO dynamically acquire the commit depth of a given repo
-func setCommitDepth(c float64) int {
+func setCommitDepth(c int) int {
 	if c == -1 {
 		return 9999999999
 	}
-	return int(c)
+	return c
+}
+
+// PrintDebug will print a debug header at the start of the session that displays specific setting
+func PrintDebug(signatureVersion string) string {
+	maxFileSize := cfg.Global.MaxFileSize * 1024 * 1024
+	var out string
+	out += "\n"
+	out += "Debug Info\n"
+	out += fmt.Sprintf("App version..............%v\n", cfg.Global.AppVersion)
+	out += fmt.Sprintf("Signatures version.......%v\n", signatureVersion)
+	out += fmt.Sprintf("Scanning tests...........%v\n", cfg.Global.ScanTests)
+	out += fmt.Sprintf("Max file size............%d\n", maxFileSize)
+	out += fmt.Sprintf("JSON output..............%v\n", cfg.Global.JSONOutput)
+	out += fmt.Sprintf("CSV output...............%v\n", cfg.Global.CSVOutput)
+	out += fmt.Sprintf("Silent output............%v\n", cfg.Global.Silent)
+	out += fmt.Sprintf("Web server enabled.......%v\n", cfg.Global.WebServer)
+	return out
 }

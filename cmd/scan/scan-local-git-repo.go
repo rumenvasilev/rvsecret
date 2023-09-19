@@ -3,6 +3,7 @@
 package scan
 
 import (
+	"github.com/rumenvasilev/rvsecret/internal/config"
 	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/internal/pkg"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/api"
@@ -14,18 +15,18 @@ import (
 var scanLocalGitRepoCmd = &cobra.Command{
 	Use:   "local-git-repo",
 	Short: "Scan a git repo on a local machine",
-	Run: func(cmd *cobra.Command, args []string) {
-		log := log.NewLogger(viper.GetBool("debug"), viper.GetBool("silent"))
-		err := pkg.Scan(api.LocalGit, log)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.Load(api.LocalGit)
 		if err != nil {
-			log.Fatal("%v", err)
+			return err
 		}
+		log := log.NewLogger(cfg.Global.Debug, cfg.Global.Silent)
+		return pkg.Scan(cfg, log)
 	},
 }
 
 func init() {
 	ScanCmd.AddCommand(scanLocalGitRepoCmd)
-	// scanLocalGitRepoCmd.Flags().Float64("commit-depth", -1, "Set the commit depth to scan")
-	scanLocalGitRepoCmd.Flags().StringSlice("local-repos", nil, "List of local git repos to scan")
-	viper.BindPFlags(scanLocalGitRepoCmd.Flags()) //nolint:errcheck
+	scanLocalGitRepoCmd.Flags().StringSliceP("paths", "p", nil, "List of local git repos to scan")
+	viper.BindPFlag("local.repos", scanLocalGitRepoCmd.Flags().Lookup("paths")) //nolint:errcheck
 }

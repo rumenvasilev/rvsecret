@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"regexp"
 	"sync"
 
@@ -20,32 +21,45 @@ type Client struct {
 }
 
 // NewClient creates a gitlab api client instance using a token
-func NewClient(token string, gheURL string, logger *log.Logger) (*Client, error) {
+func NewClient(token, gheURL string, logger *log.Logger) (*Client, error) {
 	err := validateAPIToken(token)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("APIToken is invalid, %q", token)
 	}
 	// Get OAuth client
 	oauth := getOauthClient(token)
-	var c *github.Client
-	// Github Enterprise
 	if gheURL != "" {
-		baseURL := fmt.Sprintf("%s/api/v3", gheURL)
-		uploadURL := fmt.Sprintf("%s/api/uploads", gheURL)
-		c, err = github.NewEnterpriseClient(baseURL, uploadURL, oauth)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse --github-enterprise-url: <%s>, %w", gheURL, err)
-		}
-	} else {
-		c = github.NewClient(oauth)
+		return newEnterpriseClient(oauth, gheURL, logger)
 	}
+	return newStandardClient(oauth, logger), nil
+}
 
+func newStandardClient(oauth *http.Client, logger *log.Logger) *Client {
+	c := github.NewClient(oauth)
 	c.UserAgent = version.UserAgent
-	client := &Client{
+
+	return &Client{
 		apiClient: c,
 		logger:    logger,
 	}
-	return client, nil
+}
+
+func newEnterpriseClient(oauth *http.Client, gheURL string, logger *log.Logger) (*Client, error) {
+	baseURL := fmt.Sprintf("%s/api/v3", gheURL)
+	uploadURL := fmt.Sprintf("%s/api/uploads", gheURL)
+
+	var c *github.Client
+	c, err := github.NewEnterpriseClient(baseURL, uploadURL, oauth)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse --github-enterprise-url: %q, %w", gheURL, err)
+	}
+
+	c.UserAgent = version.UserAgent
+
+	return &Client{
+		apiClient: c,
+		logger:    logger,
+	}, nil
 }
 
 // validateAPIToken will ensure we have a valid github api token
@@ -221,4 +235,22 @@ func (c *Client) GetOrganizationMembers(ctx context.Context, target _coreapi.Own
 	wg.Wait()
 
 	return allMembers, nil
+}
+
+func (c *Client) GetLatestRelease(ctx context.Context, owner, repo string) (*github.RepositoryRelease, error) {
+	release, _, err := c.apiClient.Repositories.GetLatestRelease(ctx, owner, repo)
+	if err != nil {
+		return nil, err
+	}
+
+	return release, nil
+}
+
+func (c *Client) GetReleaseByTag(ctx context.Context, owner, repo, tag string) (*github.RepositoryRelease, error) {
+	release, _, err := c.apiClient.Repositories.GetReleaseByTag(ctx, owner, repo, tag)
+	if err != nil {
+		return nil, err
+	}
+
+	return release, nil
 }

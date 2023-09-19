@@ -34,7 +34,7 @@ type Finding struct {
 // setupUrls will set the urls used to search through either github or gitlab for inclusion in the finding data
 func (f *Finding) setupUrls(sess *Session) {
 	var baseURL string
-	switch sess.Config.ScanType {
+	switch sess.Config.Global.ScanType {
 	// case api.GithubEnterprise:
 	// baseURL = sess.GithubEnterpriseURL
 	// SHOULD THIS BE THIS WAY?
@@ -44,8 +44,8 @@ func (f *Finding) setupUrls(sess *Session) {
 	case api.Github, api.GithubEnterprise:
 		baseURL = "https://github.com"
 		// TODO: IS THIS CORRECT??
-		if sess.Config.ScanType == api.GithubEnterprise {
-			baseURL = sess.Config.GithubEnterpriseURL
+		if sess.Config.Global.ScanType == api.GithubEnterprise {
+			baseURL = sess.Config.Github.GithubEnterpriseURL
 		}
 		f.RepositoryURL = fmt.Sprintf("%s/%s/%s", baseURL, f.RepositoryOwner, f.RepositoryName)
 		f.FileURL = fmt.Sprintf("%s/blob/%s/%s", f.RepositoryURL, f.CommitHash, f.FilePath)
@@ -65,7 +65,7 @@ func (f *Finding) Initialize(sess *Session) {
 }
 
 func (f *Finding) RealtimeOutput(sess *Session) {
-	if !sess.Config.Silent && !sess.Config.CSVOutput && !sess.Config.JSONOutput {
+	if !sess.Config.Global.Silent && !sess.Config.Global.CSVOutput && !sess.Config.Global.JSONOutput {
 		log := sess.Out
 		log.Warn(" %s", strings.ToUpper(f.Description))
 		log.Info("  SignatureID..........: %s", f.SignatureID)

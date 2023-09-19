@@ -48,11 +48,11 @@ all: pretty clean build
 
 ## build		Download dependencies and build
 build: prep
-	@GOOS=$(target_os) GOARCH=$(target_arch) go build -o ./bin/$(pkg)-$(target_os)
+	@GOOS=$(target_os) GOARCH=$(target_arch) go build -mod vendor -o ./bin/$(pkg)-$(target_os)
 
 ## release		Download dependencies and build release binaries
 release: prep
-	@GOOS=$(target_os) GOARCH=$(target_arch) go build -ldflags="-s -w" -o ./bin/$(pkg)$(target_ext)
+	@GOOS=$(target_os) GOARCH=$(target_arch) go build -mod vendor -ldflags="-s -w" -o ./bin/$(pkg)$(target_ext)
 
 ## clean		Clean binaries
 clean:
@@ -85,5 +85,5 @@ pretty:
 
 ## test		Run tests with coverage
 test: pretty
-	go test ./... -cover -race
+	go test -mod vendor ./... -cover -race
 

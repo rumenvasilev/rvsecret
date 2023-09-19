@@ -24,16 +24,15 @@ type Owner struct {
 
 // Repository holds the info we want for a repo itself
 type Repository struct {
-	ID            int64
 	Owner         string
 	Name          string
 	FullName      string
 	CloneURL      string
 	URL           string
 	DefaultBranch string
-	// WHY DO WE NEED THESE FIELDS AT ALL???
-	Description string
-	Homepage    string
+	Description   string // WHY DO WE NEED THIS FIELD???
+	Homepage      string // WHY DO WE NEED THIS FIELD???
+	ID            int64
 }
 
 type Status string

@@ -25,24 +25,22 @@ import (
 
 // Session contains all the necessary values and parameters used during a scan
 type Session struct {
-	Config *config.Config
-	// Client holds the client for the target git server (github, gitlab)
-	Client provider.IClient `json:"-"`
-	State  *State
-	// GithubUsers       []*github.User
+	Client           provider.IClient `json:"-"` // Client holds the client for the target git server (github, gitlab)
+	Config           *config.Config
+	State            *State
+	Out              *log.Logger `json:"-"`
+	Router           *gin.Engine `json:"-"`
+	SignatureVersion string
 	GithubUsers      []*_coreapi.Owner
 	GithubUserLogins []string
 	GithubUserOrgs   []string
 	GithubUserRepos  []string
 	Organizations    []*github.Organization
-	Out              *log.Logger `json:"-"`
-	Router           *gin.Engine `json:"-"`
 	Signatures       []*Signature
-	SignatureVersion string
 }
 
 type State struct {
-	sync.Mutex
+	*sync.Mutex
 	Stats        *stats.Stats
 	Findings     []*Finding
 	Targets      []*_coreapi.Owner
@@ -71,7 +69,7 @@ func NewSessionWithConfig(cfg *config.Config, log *log.Logger) (*Session, error)
 func (s *Session) Initialize(cfg *config.Config, log *log.Logger) error {
 	s.Out = log
 	s.Config = cfg
-	s.State = &State{}
+	s.State = &State{Mutex: &sync.Mutex{}}
 	s.State.Stats = stats.Init()
 
 	s.InitThreads()
@@ -85,19 +83,18 @@ func (s *Session) Initialize(cfg *config.Config, log *log.Logger) error {
 
 	// signaturessss
 	// TODO need to catch this error here
-	for _, f := range cfg.SignatureFiles {
-		f = strings.TrimSpace(f)
-		h, err := util.SetHomeDir(f)
+	f := cfg.Signatures.File
+	f = strings.TrimSpace(f)
+	h, err := util.SetHomeDir(f)
+	if err != nil {
+		return err
+	}
+	if util.PathExists(h, s.Out) {
+		curSig, err = LoadSignatures(h, cfg.Global.ConfidenceLevel, s)
 		if err != nil {
 			return err
 		}
-		if util.PathExists(h, s.Out) {
-			curSig, err = LoadSignatures(h, cfg.ConfidenceLevel, s)
-			if err != nil {
-				return err
-			}
-			combinedSig = append(combinedSig, curSig...)
-		}
+		combinedSig = append(combinedSig, curSig...)
 	}
 	Signatures = combinedSig
 	return nil
@@ -149,12 +146,12 @@ func (s *Session) AddFinding(finding *Finding) {
 
 // InitThreads will set the correct number of threads based on the commandline flags
 func (s *Session) InitThreads() {
-	if s.Config.Threads <= 0 {
+	if s.Config.Global.Threads <= 0 {
 		numCPUs := runtime.NumCPU()
-		s.Config.Threads = numCPUs
+		s.Config.Global.Threads = numCPUs
 		s.Out.Debug("Setting threads to %d", numCPUs)
 	}
-	runtime.GOMAXPROCS(s.Config.Threads + 2) // thread count + main + web server
+	runtime.GOMAXPROCS(s.Config.Global.Threads + 2) // thread count + main + web server
 }
 
 // SaveToFile will save a json representation of the session output to a file
@@ -169,22 +166,6 @@ func (s *Session) InitThreads() {
 // 	}
 // 	return nil
 // }
-
-// PrintDebug will print a debug header at the start of the session that displays specific setting
-func PrintDebug(sess *Session) {
-	maxFileSize := sess.Config.MaxFileSize * 1024 * 1024
-	sess.Out.Debug("\n")
-	sess.Out.Debug("Debug Info")
-	sess.Out.Debug("App version..............%v", sess.Config.AppVersion)
-	sess.Out.Debug("Signatures version.......%v", sess.SignatureVersion)
-	sess.Out.Debug("Scanning tests...........%v", sess.Config.ScanTests)
-	sess.Out.Debug("Max file size............%d", maxFileSize)
-	sess.Out.Debug("JSON output..............%v", sess.Config.JSONOutput)
-	sess.Out.Debug("CSV output...............%v", sess.Config.CSVOutput)
-	sess.Out.Debug("Silent output............%v", sess.Config.Silent)
-	sess.Out.Debug("Web server enabled.......%v", sess.Config.WebServer)
-	// log.Debug("")
-}
 
 // PrintSessionStats will print the performance and sessions stats to stdout at the conclusion of a session scan
 func printSessionStats(s *stats.Stats, log *log.Logger, appVersion, signatureVersion string) {
@@ -224,7 +205,7 @@ func SummaryOutput(sess *Session) {
 		})
 	}
 
-	if sess.Config.JSONOutput {
+	if sess.Config.Global.JSONOutput {
 		if len(sess.State.Findings) > 0 {
 			b, err := json.MarshalIndent(sess.State.Findings, "", "    ")
 			if err != nil {
@@ -242,7 +223,7 @@ func SummaryOutput(sess *Session) {
 		}
 	}
 
-	if sess.Config.CSVOutput {
+	if sess.Config.Global.CSVOutput {
 		w := csv.NewWriter(os.Stdout)
 		defer w.Flush()
 		header := []string{
@@ -292,7 +273,7 @@ func SummaryOutput(sess *Session) {
 		}
 	}
 
-	if !sess.Config.JSONOutput && !sess.Config.CSVOutput {
-		printSessionStats(sess.State.Stats, sess.Out, sess.Config.AppVersion, sess.SignatureVersion)
+	if !sess.Config.Global.JSONOutput && !sess.Config.Global.CSVOutput {
+		printSessionStats(sess.State.Stats, sess.Out, sess.Config.Global.AppVersion, sess.SignatureVersion)
 	}
 }

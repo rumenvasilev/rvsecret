@@ -36,3 +36,5 @@
 ## Bugs
 - C++ generates false-positives (cisco/mlspp repository) --> should try with different signatures perhaps (like gitleaks?)
 - "View commit on gitlab" (webserver) when using `local-git-repo`
+- Snyk report!
+- failed cloning repository https://github.com/Senzing/knowledge-base.git, empty git-upload-pack given -> does not result in the tool exiting with 1

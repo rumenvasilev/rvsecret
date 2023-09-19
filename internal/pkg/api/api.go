@@ -8,5 +8,6 @@ const (
 	Gitlab           ScanType = "gitlab"
 	LocalGit         ScanType = "localGit"
 	LocalPath        ScanType = "localpath"
+	Unknown          ScanType = "unknown" // for testing
 	UpdateSignatures ScanType = "update-signatures"
 )

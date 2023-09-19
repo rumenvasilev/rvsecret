@@ -27,7 +27,7 @@ func doFileScan(filename string, sess *core.Session) {
 	sess.State.Stats.IncrementFilesTotal()
 
 	mf := matchfile.New(filename)
-	if mf.IsSkippable(sess.Config.SkippableExt, sess.Config.SkippablePath) {
+	if mf.IsSkippable(sess.Config.Global.SkippableExt, sess.Config.Global.SkippablePath) {
 		sess.Out.Debug("%s is listed as skippable and is being ignored", filename)
 		sess.State.Stats.IncrementFilesIgnored()
 		return
@@ -36,7 +36,7 @@ func doFileScan(filename string, sess *core.Session) {
 	// If we are not scanning tests then drop all files that match common test file patterns
 	// If we do not want to scan any test files or paths we check for them and then exclude them if they are found
 	// The default is to not scan test files or common test paths
-	if !sess.Config.ScanTests {
+	if !sess.Config.Global.ScanTests {
 		likelyTestFile = util.IsTestFileOrPath(filename)
 	}
 
@@ -49,14 +49,14 @@ func doFileScan(filename string, sess *core.Session) {
 
 	// Check the file size of the file. If it is greater than the default size
 	// then we increment the ignored file count and pass on through.
-	val, msg := util.IsMaxFileSize(filename, sess.Config.MaxFileSize)
+	val, msg := util.IsMaxFileSize(filename, sess.Config.Global.MaxFileSize)
 	if val {
 		sess.State.Stats.IncrementFilesIgnored()
 		sess.Out.Debug("%s %s", filename, msg)
 		return
 	}
 
-	if sess.Config.Debug {
+	if sess.Config.Global.Debug {
 		// Print the filename of every file being scanned
 		sess.Out.Debug("Analyzing %s", filename)
 	}
@@ -73,7 +73,7 @@ func doFileScan(filename string, sess *core.Session) {
 			content = cleanK[1]
 
 			// destroy the secret if the flag is set
-			if sess.Config.HideSecrets {
+			if sess.Config.Global.HideSecrets {
 				content = ""
 			}
 
@@ -112,7 +112,7 @@ func scanDir(path string, sess *core.Session) {
 	defer cancel()
 
 	// get an slice of of all paths
-	files, err := search(ctx, path, sess.Config.SkippablePath, sess)
+	files, err := search(ctx, path, sess.Config.Global.SkippablePath, sess)
 	if err != nil {
 		sess.Out.Error("There is an error scanning %s: %s", path, err.Error())
 	}

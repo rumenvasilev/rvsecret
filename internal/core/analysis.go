@@ -35,11 +35,11 @@ func AnalyzeRepositories(sess *Session, stats *stats.Stats, log *log.Logger) {
 	// Calculate the number of threads based on the flag and the number of repos. If the number of repos
 	// being scanned is less than the number of threads the user requested, then the thread count is the
 	// number of repos.
-	threadNum := sess.Config.Threads
-	log.Debug("Defaulting threadNum to %d", sess.Config.Threads)
+	threadNum := sess.Config.Global.Threads
+	log.Debug("Defaulting threadNum to %d", sess.Config.Global.Threads)
 	if repoCnt <= 1 {
 		threadNum = 1
-	} else if repoCnt <= sess.Config.Threads {
+	} else if repoCnt <= sess.Config.Global.Threads {
 		log.Debug("Setting threadNum to %d", repoCnt)
 		threadNum = repoCnt
 	}
@@ -172,7 +172,7 @@ func (sess *Session) isDirtyCommit(commit *object.Commit, repo _coreapi.Reposito
 		mf := matchfile.New(fullFilePath)
 
 		// Check if file has to be ignored
-		if ok, msg := ignoredFile(sess.Config.ScanTests, sess.Config.MaxFileSize, fullFilePath, mf, sess.Config.SkippableExt, sess.Config.SkippablePath); ok {
+		if ok, msg := ignoredFile(sess.Config.Global.ScanTests, sess.Config.Global.MaxFileSize, fullFilePath, mf, sess.Config.Global.SkippableExt, sess.Config.Global.SkippablePath); ok {
 			log.Debug("[THREAD #%d][%s] %s %s", tid, repo.CloneURL, fPath, msg)
 			stats.IncrementFilesIgnored()
 			continue
@@ -204,7 +204,7 @@ func (sess *Session) isDirtyCommit(commit *object.Commit, repo _coreapi.Reposito
 				for k, v := range matchMap {
 					// Default to no content, only publish information if explicitly allowed to
 					content = ""
-					if matchMap != nil && !sess.Config.HideSecrets {
+					if matchMap != nil && !sess.Config.Global.HideSecrets {
 						// This sets the content for the finding, in this case the actual secret
 						// is the content. This can be removed and hidden via a commandline flag.
 						cleanK := strings.SplitAfterN(k, "_", 2)
@@ -275,7 +275,7 @@ func createFinding(changeAction, content string, commit *object.Commit, sig Sign
 		CommitMessage:    strings.TrimSpace(commit.Message),
 		Description:      sig.Description(),
 		FilePath:         fPath,
-		AppVersion:       sess.Config.AppVersion,
+		AppVersion:       sess.Config.Global.AppVersion,
 		LineNumber:       strconv.Itoa(lineNum),
 		RepositoryName:   repo.Name,
 		RepositoryOwner:  repo.Owner,

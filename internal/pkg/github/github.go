@@ -2,21 +2,15 @@ package github
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rumenvasilev/rvsecret/internal/config"
 	"github.com/rumenvasilev/rvsecret/internal/core"
 	"github.com/rumenvasilev/rvsecret/internal/log"
-	"github.com/rumenvasilev/rvsecret/internal/pkg/api"
 	"github.com/rumenvasilev/rvsecret/internal/webserver"
 )
 
-func Scan(log *log.Logger) error {
-	// load config
-	cfg, err := config.Load(api.Github)
-	if err != nil {
-		return err
-	}
-
+func Scan(cfg *config.Config, log *log.Logger) error {
 	// create session
 	sess, err := core.NewSessionWithConfig(cfg, log)
 	if err != nil {
@@ -30,17 +24,18 @@ func Scan(log *log.Logger) error {
 	}
 
 	// Start webserver
-	if sess.Config.WebServer && !sess.Config.Silent {
+	if cfg.Global.WebServer && !cfg.Global.Silent {
 		ws := webserver.New(*cfg, sess.State, log)
 		go ws.Start()
 	}
 
 	// By default we display a header to the user giving basic info about application. This will not be displayed
 	// during a silent run which is the default when using this in an automated fashion.
-	core.HeaderInfo(*sess.Config, sess.State.Stats, sess.Out)
+	core.HeaderInfo(*cfg, sess.State.Stats.StartedAt.Format(time.RFC3339), sess.Out)
 
-	if sess.Config.Debug {
-		core.PrintDebug(sess)
+	if cfg.Global.Debug {
+		fmt.Println("Global debug set to", cfg.Global.Debug)
+		log.Debug(config.PrintDebug(sess.SignatureVersion))
 	}
 
 	log.Debug("We have these orgs: %s", sess.GithubUserOrgs)
@@ -62,7 +57,7 @@ func Scan(log *log.Logger) error {
 		if err != nil {
 			return err
 		}
-	} else if sess.Config.ExpandOrgs && sess.GithubUserOrgs != nil {
+	} else if cfg.Global.ExpandOrgs && sess.GithubUserOrgs != nil {
 		// FIXME: this should be from --add-org-members
 		core.GatherOrgsMembersRepositories(sess)
 	} else if sess.GithubUserOrgs != nil {
@@ -85,7 +80,7 @@ func Scan(log *log.Logger) error {
 
 	core.SummaryOutput(sess)
 
-	if !sess.Config.Silent && sess.Config.WebServer {
+	if !cfg.Global.Silent && cfg.Global.WebServer {
 		log.Important("Press Ctrl+C to stop web server and exit.")
 		select {}
 	}

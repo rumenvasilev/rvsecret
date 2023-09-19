@@ -2,17 +2,21 @@ package ghe
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/rumenvasilev/rvsecret/internal/config"
 	"github.com/rumenvasilev/rvsecret/internal/core"
 	"github.com/rumenvasilev/rvsecret/internal/log"
-	"github.com/rumenvasilev/rvsecret/internal/pkg/api"
+	"github.com/rumenvasilev/rvsecret/internal/webserver"
 )
 
-func Scan(log *log.Logger) error {
-	sess, err := core.NewSession(api.GithubEnterprise, log)
+func Scan(cfg *config.Config, log *log.Logger) error {
+	// create session
+	sess, err := core.NewSessionWithConfig(cfg, log)
 	if err != nil {
 		return err
 	}
+
 	// Ensure user input exists and validate it
 	err = sess.ValidateUserInput()
 	if err != nil {
@@ -20,9 +24,15 @@ func Scan(log *log.Logger) error {
 		return err
 	}
 
+	// Start webserver
+	if cfg.Global.WebServer && !cfg.Global.Silent {
+		ws := webserver.New(*cfg, sess.State, log)
+		go ws.Start()
+	}
+
 	// By default we display a header to the user giving basic info about application. This will not be displayed
 	// during a silent run which is the default when using this in an automated fashion.
-	core.HeaderInfo(*sess.Config, sess.State.Stats, sess.Out)
+	core.HeaderInfo(*cfg, sess.State.Stats.StartedAt.Format(time.RFC3339), log)
 
 	log.Debug("We have these orgs: %s", sess.GithubUserOrgs)
 	log.Debug("We have these users: %s", sess.GithubUserLogins)
@@ -86,7 +96,7 @@ func Scan(log *log.Logger) error {
 
 	core.SummaryOutput(sess)
 
-	if !sess.Config.Silent && sess.Config.WebServer {
+	if !cfg.Global.Silent && cfg.Global.WebServer {
 		log.Important("Press Ctrl+C to stop web server and exit.")
 		select {}
 	}

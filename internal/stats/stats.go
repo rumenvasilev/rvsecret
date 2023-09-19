@@ -9,9 +9,8 @@ import (
 
 // Stats hold various runtime statistics used for perf data as well generating various reports
 // They are accessed from the web server as well
-type Stats struct { // TODO alpha sort this
-	sync.Mutex
-
+type Stats struct {
+	*sync.Mutex
 	StartedAt           time.Time       // The time we started the scan
 	FinishedAt          time.Time       // The time we finished the scan
 	Status              _coreapi.Status // The running status of a scan for the web interface
@@ -39,6 +38,7 @@ type Stats struct { // TODO alpha sort this
 // InitStats will set the initial values for a session
 func Init() *Stats {
 	return &Stats{
+		Mutex:         &sync.Mutex{},
 		FilesIgnored:  0,
 		FilesScanned:  0,
 		FindingsTotal: 0,

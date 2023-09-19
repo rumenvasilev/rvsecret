@@ -38,15 +38,15 @@ func (e *Engine) Start() {
 }
 
 type Engine struct {
-	Listener string // address:port
 	*gin.Engine
 	*log.Logger
+	Listener string // address:port
 }
 
 // New will create an instance of the web frontend, setting the necessary parameters.
 func New(cfg config.Config, state *core.State, log *log.Logger) *Engine {
 	gin.SetMode(gin.ReleaseMode)
-	if cfg.Debug {
+	if cfg.Global.Debug {
 		gin.SetMode(gin.DebugMode)
 	}
 
@@ -87,10 +87,10 @@ func New(cfg config.Config, state *core.State, log *log.Logger) *Engine {
 	router.GET("/api/repositories", func(c *gin.Context) {
 		c.JSON(200, state.Repositories)
 	})
-	router.GET("/api/files/:owner/:repo/:commit/*path", fetch{scanType: cfg.ScanType}.file)
+	router.GET("/api/files/:owner/:repo/:commit/*path", fetch{scanType: cfg.Global.ScanType}.file)
 
 	return &Engine{
-		Listener: fmt.Sprintf("%s:%d", cfg.BindAddress, cfg.BindPort),
+		Listener: fmt.Sprintf("%s:%d", cfg.Global.BindAddress, cfg.Global.BindPort),
 		Logger:   log,
 		Engine:   router,
 	}

@@ -2,6 +2,7 @@ package util
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -139,4 +140,34 @@ func IsTestFileOrPath(fullPath string) bool {
 	// Ex. foo_test_baz
 	r = regexp.MustCompile(`(?i)_test?_`)
 	return r.MatchString(fName)
+}
+
+func MakeHomeDir(path string, log *log.Logger) (string, error) {
+	dir, err := SetHomeDir(path)
+	if err != nil {
+		return "", err
+	}
+
+	if !PathExists(dir, log) {
+		// create
+		err = os.MkdirAll(dir, 0700)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return dir, nil
+}
+
+// WriteToFile will create a new file or truncate the existing one and write the input byte stream.
+func WriteToFile(path string, input []byte) error {
+	fh, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	_, err = fh.Write(input)
+	if err != nil {
+		return fmt.Errorf("failed writing to configuration file, %w", err)
+	}
+	return nil
 }

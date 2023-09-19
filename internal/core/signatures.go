@@ -57,56 +57,56 @@ type Signature interface {
 // SignaturesMetaData is used by updateSignatures to determine if/how to update the signatures
 type SignaturesMetaData struct {
 	Date    string
-	Time    int
 	Version string
+	Time    int
 }
 
 // SafeFunctionSignature holds the information about a safe function, that is used to detect and mitigate false positives
 type SafeFunctionSignature struct {
+	match           *regexp.Regexp
 	comment         string
 	description     string
-	enable          int
-	entropy         float64
-	match           *regexp.Regexp
-	confidenceLevel int
 	part            string
 	signatureid     string
+	enable          int
+	entropy         float64
+	confidenceLevel int
 }
 
 // SimpleSignature holds the information about a simple signature which is used to match a path or filename
 type SimpleSignature struct {
 	comment         string
 	description     string
-	enable          int
-	entropy         float64
 	match           string
-	confidenceLevel int
 	part            string
 	signatureid     string
+	enable          int
+	entropy         float64
+	confidenceLevel int
 }
 
 // PatternSignature holds the information about a pattern signature which is a regex used to match content within a file
 type PatternSignature struct {
+	match           *regexp.Regexp
 	comment         string
 	description     string
-	enable          int
-	entropy         float64
-	match           *regexp.Regexp
-	confidenceLevel int
 	part            string
 	signatureid     string
+	enable          int
+	entropy         float64
+	confidenceLevel int
 }
 
 // SignatureDef maps to a signature within the yaml file
 type SignatureDef struct {
 	Comment         string  `yaml:"comment"`
 	Description     string  `yaml:"description"`
-	Enable          int     `yaml:"enable"`
-	Entropy         float64 `yaml:"entropy"`
 	Match           string  `yaml:"match"`
-	ConfidenceLevel int     `yaml:"confidence-level"`
 	Part            string  `yaml:"part"`
 	SignatureID     string  `yaml:"signatureid"`
+	Enable          int     `yaml:"enable"`
+	Entropy         float64 `yaml:"entropy"`
+	ConfidenceLevel int     `yaml:"confidence-level"`
 }
 
 // SignatureConfig holds the base file structure for the signatures file
@@ -252,7 +252,7 @@ func (s PatternSignature) ExtractMatch(file matchfile.MatchFile, sess *Session, 
 			}
 		}
 
-		if sess.Config.ScanType != api.LocalPath {
+		if sess.Config.Global.ScanType != api.LocalPath {
 			content, err := GetChangeContent(change)
 			if err != nil {
 				sess.Out.Error("Error retrieving content in commit %s, change %s: %s", "commit.String()", change.String(), err)
@@ -369,7 +369,6 @@ func (s SafeFunctionSignature) ExtractMatch(file matchfile.MatchFile, sess *Sess
 
 // LoadSignatures will load all known signatures for the various match types into the session
 func LoadSignatures(filePath string, mLevel int, sess *Session) ([]Signature, error) { // TODO we don't need to bring in session here
-
 	// ensure that we have the proper home directory
 	fp, err := util.SetHomeDir(filePath)
 	if err != nil {
@@ -380,7 +379,6 @@ func LoadSignatures(filePath string, mLevel int, sess *Session) ([]Signature, er
 	if err != nil {
 		return []Signature{}, fmt.Errorf("failed to load signatures file %s: %w", filePath, err)
 	}
-
 	signaturesMetaData := SignaturesMetaData{
 		Version: c.Meta.Version,
 		Date:    c.Meta.Date,
@@ -408,14 +406,14 @@ func LoadSignatures(filePath string, mLevel int, sess *Session) ([]Signature, er
 			}
 
 			SimpleSignatures = append(SimpleSignatures, SimpleSignature{
-				curSig.Comment,
-				curSig.Description,
-				curSig.Enable,
-				curSig.Entropy,
-				curSig.Match,
-				curSig.ConfidenceLevel,
-				part,
-				curSig.SignatureID,
+				comment:         curSig.Comment,
+				description:     curSig.Description,
+				match:           curSig.Match,
+				part:            part,
+				signatureid:     curSig.SignatureID,
+				enable:          curSig.Enable,
+				entropy:         curSig.Entropy,
+				confidenceLevel: curSig.ConfidenceLevel,
 			})
 		}
 	}
@@ -438,14 +436,14 @@ func LoadSignatures(filePath string, mLevel int, sess *Session) ([]Signature, er
 
 			match := regexp.MustCompile(curSig.Match)
 			PatternSignatures = append(PatternSignatures, PatternSignature{
-				curSig.Comment,
-				curSig.Description,
-				curSig.Enable,
-				curSig.Entropy,
-				match,
-				curSig.ConfidenceLevel,
-				part,
-				curSig.SignatureID,
+				match:           match,
+				comment:         curSig.Comment,
+				description:     curSig.Description,
+				part:            part,
+				signatureid:     curSig.SignatureID,
+				enable:          curSig.Enable,
+				entropy:         curSig.Entropy,
+				confidenceLevel: curSig.ConfidenceLevel,
 			})
 		}
 	}
@@ -468,14 +466,14 @@ func LoadSignatures(filePath string, mLevel int, sess *Session) ([]Signature, er
 
 			match := regexp.MustCompile(curSig.Match)
 			SafeFunctionSignatures = append(SafeFunctionSignatures, SafeFunctionSignature{
-				curSig.Comment,
-				curSig.Description,
-				curSig.Enable,
-				curSig.Entropy,
-				match,
-				curSig.ConfidenceLevel,
-				part,
-				curSig.SignatureID,
+				match:           match,
+				comment:         curSig.Comment,
+				description:     curSig.Description,
+				part:            part,
+				signatureid:     curSig.SignatureID,
+				enable:          curSig.Enable,
+				entropy:         curSig.Entropy,
+				confidenceLevel: curSig.ConfidenceLevel,
 			})
 		}
 	}

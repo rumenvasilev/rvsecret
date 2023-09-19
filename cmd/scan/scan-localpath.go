@@ -3,6 +3,7 @@
 package scan
 
 import (
+	"github.com/rumenvasilev/rvsecret/internal/config"
 	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/internal/pkg"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/api"
@@ -15,17 +16,18 @@ var scanLocalPathCmd = &cobra.Command{
 	TraverseChildren: true,
 	Use:              "localpath",
 	Short:            "Scan local files and directories",
-	Run: func(cmd *cobra.Command, args []string) {
-		log := log.NewLogger(viper.GetBool("debug"), viper.GetBool("silent"))
-		err := pkg.Scan(api.LocalPath, log)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.Load(api.LocalPath)
 		if err != nil {
-			log.Fatal("%v", err)
+			return err
 		}
+		log := log.NewLogger(cfg.Global.Debug, cfg.Global.Silent)
+		return pkg.Scan(cfg, log)
 	},
 }
 
 func init() {
 	ScanCmd.AddCommand(scanLocalPathCmd)
 	scanLocalPathCmd.Flags().StringSliceP("paths", "p", nil, "List of local paths to scan")
-	viper.BindPFlags(scanLocalPathCmd.Flags()) //nolint:errcheck
+	viper.BindPFlag("local.paths", scanLocalPathCmd.Flags().Lookup("paths")) //nolint:errcheck
 }

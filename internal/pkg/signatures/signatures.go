@@ -1,107 +1,81 @@
 package signatures
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 
+	"github.com/google/go-github/github"
 	cp "github.com/otiai10/copy"
+	"github.com/rumenvasilev/rvsecret/internal/config"
 	"github.com/rumenvasilev/rvsecret/internal/core"
 	"github.com/rumenvasilev/rvsecret/internal/log"
-	"github.com/rumenvasilev/rvsecret/internal/pkg/api"
 	"github.com/rumenvasilev/rvsecret/internal/util"
-	"github.com/spf13/viper"
 	whilp "github.com/whilp/git-urls"
-	"gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/plumbing"
 )
 
-func Update(log *log.Logger) error {
-	sess, err := core.NewSession(api.UpdateSignatures, log)
+// https://raw.githubusercontent.com/N0MoreSecr3ts/wraith-signatures/develop/signatures/default.yaml
+
+// signature version options
+// `latest` => last release in github
+// `current` => main branch latest commit
+// `semver` => specific version
+
+func Update(cfg *config.Config, log *log.Logger) error {
+	var dir string
+
+	// create session
+	sess, err := core.NewSessionWithConfig(cfg, log)
 	if err != nil {
 		return err
 	}
 
-	// get the signatures version or if blank, set it to latest
-	// TODO this should be in the default values from the session
-	signatureVersion := "latest"
-	if viper.GetString("signatures-path") != "" {
-		signatureVersion = viper.GetString("signatures-version")
+	switch cfg.Signatures.Version {
+	case "latest":
+		log.Debug("Fetching latest release")
+	default:
+		log.Debug("Fetching a specific version: %q", cfg.Signatures.Version)
+		semver := regexp.MustCompile(`^[0-2].[0-9]+.[0-9]+$`)
+		if !semver.MatchString(cfg.Signatures.Version) {
+			return fmt.Errorf("something went wrong, %w", err)
+		}
 	}
 
-	// fetch the signatures from the remote location
-	// git clone
-	rRepo, err := fetchSignatures(signatureVersion, sess, log)
+	// try from Github REST API first
+	dir, err = fetchSignaturesFromGithubAPI(cfg.Signatures.Version, sess)
 	if err != nil {
-		return err
+		if isCredentialsError(err) {
+			log.Debug(err.Error())
+			return fmt.Errorf("github token is not authorized, please update its permissions or generate a new one")
+		}
+		log.Warn("Couldn't fetch the signatures from Github REST API, falling back to git method")
+		dir, err = fetchSignaturesWithGit(cfg.Signatures.Version, sess)
+		if err != nil {
+			return fmt.Errorf("couldn't fetch the signatures with git clone either, reason: %w", err)
+		}
 	}
 
 	// install the signatures
-	if updateSignatures(rRepo, sess, log) {
-		// TODO set this in the session so we have a single location for everything
-		fmt.Printf("The signatures have been successfully updated at: %s\n", viper.GetString("signatures-path"))
+	if updateSignatures(dir, sess, log) {
+		log.Info("The signatures have been successfully updated at: %s", cfg.Signatures.Path)
 	} else {
-		log.Warn("The signatures were not updated")
+		return fmt.Errorf("the signatures were not updated")
 	}
 	return nil
 }
 
-// fetchSignatures will download the signatures from a remote location to a temp location
-func fetchSignatures(signatureVersion string, sess *core.Session, log *log.Logger) (string, error) {
-
-	// TODO if this is not set then pull from the stock place, that should be the default url set in the session
-	rURL := viper.GetString("signatures-url")
-
-	// set the remote url that we will fetch
-	// TODO need to look into this more
-	remoteURL, err := cleanInput(rURL)
-	if err != nil {
-		return "", err
-	}
-
-	// TODO document this
-	dir, err := os.MkdirTemp("", "rvsecret")
-	if err != nil {
-		return "", err
-	}
-
-	// for now we only pull from a given version at some point we can look at pulling the latest
-	// TODO be able to pass in a commit or version string
-	repo, err := git.PlainClone(dir, false, &git.CloneOptions{
-		URL:           remoteURL,
-		ReferenceName: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", "stable")),
-		SingleBranch:  true,
-		Tags:          git.AllTags,
-	})
-	if err != nil {
-		defer os.RemoveAll(dir)
-		return "", fmt.Errorf("Failed to clone signatures repository, %w", err)
-	}
-
-	// TODO give a valid error if the version is not REMOVE ME
-	if signatureVersion != "" {
-		// Get the working tree so we can change refs
-		// TODO figure this out REMOVE ME
-		tree, err := repo.Worktree()
-		if err != nil {
-			log.Error(err.Error())
-		}
-
-		// Set the tag to the signatures version that we want to use
-		// TODO fix this REMOVE ME
-		tagName := string(signatureVersion)
-
-		// Checkout our tag
-		// TODO way are we using a tag here is we only checkout master
-		// TODO fix this
-		err = tree.Checkout(&git.CheckoutOptions{
-			Branch: plumbing.ReferenceName("refs/tags/" + tagName),
-		})
-		if err != nil {
-			return "", fmt.Errorf("Requested version not available. Please enter a valid version")
+func isCredentialsError(err error) bool {
+	var gherr *github.ErrorResponse
+	if errors.As(err, &gherr) {
+		if gherr.Response.StatusCode == http.StatusUnauthorized {
+			// log.Debug(err.Error())
+			return true
 		}
 	}
-	return dir, nil
+	return false
 }
 
 // cleanInput will ensure that any user supplied git url is in the proper format
@@ -120,21 +94,16 @@ func updateSignatures(rRepo string, sess *core.Session, log *log.Logger) bool {
 	// TODO put this in /tmp via a real library
 	tempSignaturesDir := rRepo + "/signatures"
 
-	// final resting place for the signatures
-	rPath := viper.GetString("signatures-path")
-
 	// ensure we have the proper home directory
-	var err error
-	rPath, err = util.SetHomeDir(rPath)
+	home, err := util.SetHomeDir(sess.Config.Signatures.Path)
 	if err != nil {
 		// TODO-RV: Do something more?
 		log.Error(err.Error())
 	}
 
 	// if the signatures path does not exist then we create it
-	if !util.PathExists(rPath, log) {
-
-		err := os.MkdirAll(rPath, 0700)
+	if !util.PathExists(home, log) {
+		err := os.MkdirAll(home, 0700)
 		if err != nil {
 			log.Error(err.Error())
 		}
@@ -142,19 +111,19 @@ func updateSignatures(rRepo string, sess *core.Session, log *log.Logger) bool {
 
 	// if we want to test the signatures before we install them
 	// TODO need to implement something here
-	if viper.GetBool("test-signatures") {
+	if sess.Config.Signatures.Test {
 
 		// if the tests pass then we install the signatures
 		if executeTests(rRepo) {
 
 			// copy the files from the temp directory to the signatures directory
-			if err := cp.Copy(tempSignaturesDir, rPath); err != nil {
+			if err := cp.Copy(tempSignaturesDir, home); err != nil {
 				log.Error(err.Error())
 				return false
 			}
 
 			// get all the files in the signatures directory
-			files, err := os.ReadDir(rPath)
+			files, err := os.ReadDir(home)
 			if err != nil {
 				log.Error(err.Error())
 				return false
@@ -162,7 +131,7 @@ func updateSignatures(rRepo string, sess *core.Session, log *log.Logger) bool {
 
 			// set them to the current user and the proper permissions
 			for _, f := range files {
-				if err := os.Chmod(rPath+"/"+f.Name(), 0644); err != nil {
+				if err := os.Chmod(home+"/"+f.Name(), 0644); err != nil {
 					log.Error(err.Error())
 					return false
 				}
@@ -183,13 +152,13 @@ func updateSignatures(rRepo string, sess *core.Session, log *log.Logger) bool {
 	}
 
 	// copy the files from the temp directory to the signatures directory
-	if err := cp.Copy(tempSignaturesDir, rPath); err != nil {
+	if err := cp.Copy(tempSignaturesDir, home); err != nil {
 		log.Error(err.Error())
 		return false
 	}
 
 	// get all the files in the signatures directory
-	files, err := os.ReadDir(rPath)
+	files, err := os.ReadDir(home)
 	if err != nil {
 		log.Error(err.Error())
 		return false
@@ -198,17 +167,16 @@ func updateSignatures(rRepo string, sess *core.Session, log *log.Logger) bool {
 	// set them to the current user and the proper permissions
 	// TODO ensure these are .yaml somehow
 	for _, f := range files {
-		sFileExt := filepath.Ext(rPath + "/" + f.Name())
+		sFileExt := filepath.Ext(home + "/" + f.Name())
 		if sFileExt == "yml" || sFileExt == "yaml" {
-			if err := os.Chmod(rPath+"/"+f.Name(), 0644); err != nil {
+			if err := os.Chmod(home+"/"+f.Name(), 0644); err != nil {
 				log.Error(err.Error())
 				return false
 			}
 		}
 	}
-	// TODO why is the commented out
-	// TODO Cleanup after ourselves and remove any temp garbage
-	// os.RemoveAll(tempSignaturesDir)
+	// Cleanup after ourselves and remove any temp garbage
+	_ = os.RemoveAll(rRepo)
 	return true
 }
 
