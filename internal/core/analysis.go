@@ -8,6 +8,9 @@ import (
 	"sync"
 
 	_coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
+	"github.com/rumenvasilev/rvsecret/internal/core/finding"
+	_git "github.com/rumenvasilev/rvsecret/internal/core/git"
+	"github.com/rumenvasilev/rvsecret/internal/core/signatures"
 	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/internal/matchfile"
 	"github.com/rumenvasilev/rvsecret/internal/stats"
@@ -77,7 +80,7 @@ func analyzeWorker(tid int, ch chan _coreapi.Repository, wg *sync.WaitGroup, ses
 		// The path variable is returning the path that the clone was done to. The repo is cloned directly
 		// there.
 		log.Debug("[THREAD #%d][%s] Cloning repository...", tid, repo.CloneURL)
-		clone, path, err := cloneRepository(sess, repo)
+		clone, path, err := cloneRepository(sess.Config, stats.IncrementRepositoriesCloned, repo)
 		if err != nil {
 			log.Error("%v", err)
 			cleanUpPath(path, log)
@@ -107,7 +110,7 @@ func (sess *Session) analyzeHistory(clone *git.Repository, tid int, path string,
 	log := sess.Out
 
 	// Get the full commit history for the repo
-	history, err := GetRepositoryHistory(clone)
+	history, err := _git.GetRepositoryHistory(clone)
 	if err != nil {
 		log.Error("[THREAD #%d][%s] Cannot get full commit history, error: %v", tid, repo.CloneURL, err)
 		if err := os.RemoveAll(path); err != nil {
@@ -151,7 +154,7 @@ func (sess *Session) isDirtyCommit(commit *object.Commit, repo _coreapi.Reposito
 	// through the commit history of a given repo.
 	dirtyCommit := false
 
-	changes, _ := GetChanges(commit, clone)
+	changes, _ := _git.GetChanges(commit, clone)
 	log.Debug("[THREAD #%d][%s] %d changes in %s", tid, repo.CloneURL, len(changes), commit.Hash)
 
 	for _, change := range changes {
@@ -159,10 +162,10 @@ func (sess *Session) isDirtyCommit(commit *object.Commit, repo _coreapi.Reposito
 		stats.IncrementFilesTotal()
 
 		// TODO Is this need for the finding object, why are we saving this?
-		changeAction := GetChangeAction(change)
+		changeAction := _git.GetChangeAction(change)
 
 		// TODO Add an example of the output from this function
-		fPath := GetChangePath(change)
+		fPath := _git.GetChangePath(change)
 
 		// TODO Add an example of this
 		// FIXME This is where I have tracked the in-mem-clone issue to
@@ -185,49 +188,41 @@ func (sess *Session) isDirtyCommit(commit *object.Commit, repo _coreapi.Reposito
 		// We set this to a default of false and will be used at the end of matching to
 		// increment the file count. If we try and do this in the loop it will hit for every
 		// signature and give us a false count.
-		dirtyFile := false
+		// dirtyFile := false
 
-		// for each signature that is loaded scan the file as a whole and generate a map of
-		// the match and the line number the match was found on
-		for _, signature := range Signatures {
-			bMatched, matchMap := signature.ExtractMatch(mf, sess, change)
-			if bMatched {
-				dirtyFile = true
-				dirtyCommit = true
-
-				// content will hold the secret found within the target
-				var content string
-
-				// For every instance of the secret that matched the specific signatures
-				// create a new finding. This will produce dupes as the file may exist
-				// in multiple commits.
-				for k, v := range matchMap {
-					// Default to no content, only publish information if explicitly allowed to
-					content = ""
-					if matchMap != nil && !sess.Config.Global.HideSecrets {
-						// This sets the content for the finding, in this case the actual secret
-						// is the content. This can be removed and hidden via a commandline flag.
-						cleanK := strings.SplitAfterN(k, "_", 2)
-						content = cleanK[1]
-					}
-
-					// Create a new instance of a finding and set the necessary fields.
-					finding := createFinding(changeAction, content, commit, signature, fPath, sess, v, repo)
-					// Set the urls for the finding
-					finding.Initialize(sess)
-
-					// Add it to the session
-					sess.AddFinding(finding)
-					log.Debug("[THREAD #%d][%s] Done analyzing changes in %s", tid, repo.CloneURL, commit.Hash)
-
-					// Print realtime data to stdout
-					finding.RealtimeOutput(sess)
-				}
+		// call signaturesfunc
+		dirtyFile, dcommit, out := signatures.Discover(mf, change, sess.Config, log)
+		for _, v := range out {
+			fin := &finding.Finding{
+				Action:           changeAction,
+				Content:          v.Content,
+				CommitAuthor:     commit.Author.String(),
+				CommitHash:       commit.Hash.String(),
+				CommitMessage:    strings.TrimSpace(commit.Message),
+				Description:      v.Sig.Description(),
+				FilePath:         fPath,
+				AppVersion:       sess.Config.Global.AppVersion,
+				LineNumber:       strconv.Itoa(v.LineNum),
+				RepositoryName:   repo.Name,
+				RepositoryOwner:  repo.Owner,
+				SignatureID:      v.Sig.SignatureID(),
+				SignatureVersion: sess.SignatureVersion,
+				SecretID:         util.GenerateID(),
 			}
+			_ = fin.Initialize(sess.Config.Global.ScanType, sess.Config.Github.GithubEnterpriseURL)
+			// Add it to the session
+			sess.AddFinding(fin)
+			log.Debug("[THREAD #%d][%s] Done analyzing changes in %s", tid, repo.CloneURL, commit.Hash)
+
+			// // Print realtime data to stdout
+			fin.RealtimeOutput(sess.Config.Global, log)
 		}
+
 		if dirtyFile {
-			log.Debug("this is the file getting added: %s ", fullFilePath)
 			stats.IncrementFilesDirty()
+		}
+		if dcommit {
+			dirtyCommit = dcommit
 		}
 	}
 	return dirtyCommit
@@ -264,23 +259,4 @@ func ignoredFile(cfgScanTests bool, cfgMaxFileSize int64, fullFilePath string, m
 		return true, "is skippable and is being ignored"
 	}
 	return false, ""
-}
-
-func createFinding(changeAction, content string, commit *object.Commit, sig Signature, fPath string, sess *Session, lineNum int, repo _coreapi.Repository) *Finding {
-	return &Finding{
-		Action:           changeAction,
-		Content:          content,
-		CommitAuthor:     commit.Author.String(),
-		CommitHash:       commit.Hash.String(),
-		CommitMessage:    strings.TrimSpace(commit.Message),
-		Description:      sig.Description(),
-		FilePath:         fPath,
-		AppVersion:       sess.Config.Global.AppVersion,
-		LineNumber:       strconv.Itoa(lineNum),
-		RepositoryName:   repo.Name,
-		RepositoryOwner:  repo.Owner,
-		SignatureID:      sig.SignatureID(),
-		SignatureVersion: sess.SignatureVersion,
-		SecretID:         util.GenerateID(),
-	}
 }

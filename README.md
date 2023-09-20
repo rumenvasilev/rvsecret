@@ -4,6 +4,7 @@ A hard fork of [wraith](https://github.com/N0MoreSecr3ts/wraith) (which itself i
 
 ![build status](https://github.com/rumenvasilev/rvsecret/actions/workflows/on-push.yaml/badge.svg)
 [![codecov](https://codecov.io/gh/rumenvasilev/rvsecret/graph/badge.svg?token=X2BXUU5H0S)](https://codecov.io/gh/rumenvasilev/rvsecret)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=rumenvasilev_rvsecret&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=rumenvasilev_rvsecret)
 
 rvsecret detects secrets in git repositories (or localpath). The big differentiator is it is tightly integrated with Github and Gitlab APIs and has no extra dependencies. It's just one binary you can use anywhere (even in scratch containers).
 

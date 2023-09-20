@@ -11,12 +11,11 @@ import (
 	"syscall"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/rumenvasilev/rvsecret/internal/log"
 )
 
 // TODO THIS FUNC HAS TO RETURN ERROR, OTHERWISE WE DO THE SAME CHECK AGAIN LATER
 // PathExists will check if a path exists or not and is used to validate user input
-func PathExists(path string, logger *log.Logger) bool {
+func PathExists(path string) bool {
 	_, err := os.Stat(path)
 	if e, ok := err.(*os.PathError); ok && e.Err == syscall.ENOSPC {
 		return false
@@ -27,7 +26,7 @@ func PathExists(path string, logger *log.Logger) bool {
 	}
 
 	if os.IsNotExist(err) {
-		logger.Debug("Path does not exist: %s", err.Error())
+		// logger.Debug("Path does not exist: %s", err.Error())
 		return false
 	}
 
@@ -142,13 +141,13 @@ func IsTestFileOrPath(fullPath string) bool {
 	return r.MatchString(fName)
 }
 
-func MakeHomeDir(path string, log *log.Logger) (string, error) {
+func MakeHomeDir(path string) (string, error) {
 	dir, err := SetHomeDir(path)
 	if err != nil {
 		return "", err
 	}
 
-	if !PathExists(dir, log) {
+	if !PathExists(dir) {
 		// create
 		err = os.MkdirAll(dir, 0700)
 		if err != nil {

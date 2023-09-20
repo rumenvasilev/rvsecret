@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/rumenvasilev/rvsecret/internal/core"
+	"github.com/rumenvasilev/rvsecret/internal/core/finding"
+	"github.com/rumenvasilev/rvsecret/internal/core/signatures"
 	"github.com/rumenvasilev/rvsecret/internal/matchfile"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 	"github.com/rumenvasilev/rvsecret/version"
@@ -19,7 +21,7 @@ import (
 
 // DoFileScan with create a match object and then test for various criteria necessary in order to determine if it should be scanned. This includes if it should be skipped due to a default or user supplied extension, if it matches a test regex, or is in a protected directory or is itself protected. This will only run when doing scanLocalPath.
 func doFileScan(filename string, sess *core.Session) {
-
+	log := sess.Out
 	// Set default values for all pre-requisites for a file scan
 	likelyTestFile := false
 
@@ -28,7 +30,7 @@ func doFileScan(filename string, sess *core.Session) {
 
 	mf := matchfile.New(filename)
 	if mf.IsSkippable(sess.Config.Global.SkippableExt, sess.Config.Global.SkippablePath) {
-		sess.Out.Debug("%s is listed as skippable and is being ignored", filename)
+		log.Debug("%s is listed as skippable and is being ignored", filename)
 		sess.State.Stats.IncrementFilesIgnored()
 		return
 	}
@@ -43,7 +45,7 @@ func doFileScan(filename string, sess *core.Session) {
 	if likelyTestFile {
 		// We want to know how many files have been ignored
 		sess.State.Stats.IncrementFilesIgnored()
-		sess.Out.Debug("%s is a test file and being ignored", filename)
+		log.Debug("%s is a test file and being ignored", filename)
 		return
 	}
 
@@ -52,57 +54,46 @@ func doFileScan(filename string, sess *core.Session) {
 	val, msg := util.IsMaxFileSize(filename, sess.Config.Global.MaxFileSize)
 	if val {
 		sess.State.Stats.IncrementFilesIgnored()
-		sess.Out.Debug("%s %s", filename, msg)
+		log.Debug("%s %s", filename, msg)
 		return
 	}
 
 	if sess.Config.Global.Debug {
 		// Print the filename of every file being scanned
-		sess.Out.Debug("Analyzing %s", filename)
+		log.Debug("Analyzing %s", filename)
 	}
 
 	// Increment the number of files scanned
 	sess.State.Stats.IncrementFilesScanned()
-	var content string
 	// Scan the file for know signatures
-	for _, signature := range core.Signatures {
-		bMatched, matchMap := signature.ExtractMatch(mf, sess, nil)
-		// for every instance of the secret that matched the specific rule create a new finding
-		for k, v := range matchMap {
-			cleanK := strings.SplitAfterN(k, "_", 2)
-			content = cleanK[1]
-
-			// destroy the secret if the flag is set
-			if sess.Config.Global.HideSecrets {
-				content = ""
-			}
-
-			if bMatched {
-				finding := &core.Finding{
-					FilePath:         filename,
-					Action:           `File Scan`,
-					Description:      signature.Description(),
-					SignatureID:      signature.SignatureID(),
-					Content:          content,
-					RepositoryOwner:  `not-a-repo`,
-					RepositoryName:   `not-a-repo`,
-					CommitHash:       ``,
-					CommitMessage:    ``,
-					CommitAuthor:     ``,
-					LineNumber:       strconv.Itoa(v),
-					SecretID:         util.GenerateID(),
-					AppVersion:       version.AppVersion(),
-					SignatureVersion: sess.SignatureVersion,
-				}
-
-				// Add a new finding and increment the total
-				finding.Initialize(sess)
-				sess.AddFinding(finding)
-
-				// print the current finding to stdout
-				finding.RealtimeOutput(sess)
-			}
+	dirtyFile, _, out := signatures.Discover(mf, nil, sess.Config, log)
+	for _, v := range out {
+		fin := &finding.Finding{
+			Action:           `File Scan`,
+			Content:          v.Content,
+			CommitAuthor:     ``,
+			CommitHash:       ``,
+			CommitMessage:    ``,
+			Description:      v.Sig.Description(),
+			FilePath:         filename,
+			AppVersion:       version.AppVersion(),
+			LineNumber:       strconv.Itoa(v.LineNum),
+			RepositoryName:   `not-a-repo`,
+			RepositoryOwner:  `not-a-repo`,
+			SignatureID:      v.Sig.SignatureID(),
+			SignatureVersion: sess.SignatureVersion,
+			SecretID:         util.GenerateID(),
 		}
+
+		// Add a new finding and increment the total
+		_ = fin.Initialize(sess.Config.Global.ScanType, "")
+		sess.AddFinding(fin)
+
+		// print the current finding to stdout
+		fin.RealtimeOutput(sess.Config.Global, log)
+	}
+	if dirtyFile {
+		sess.State.Stats.IncrementFilesDirty()
 	}
 }
 

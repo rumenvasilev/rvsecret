@@ -5,19 +5,21 @@ import (
 	"os"
 
 	"github.com/rumenvasilev/rvsecret/internal/core"
+	"github.com/rumenvasilev/rvsecret/internal/core/provider"
 	"gopkg.in/src-d/go-git.v4"
 	githttp "gopkg.in/src-d/go-git.v4/plumbing/transport/http"
 )
 
 // fetchSignaturesWithGit will clone the signatures repository and return the local path to it
 func fetchSignaturesWithGit(version string, sess *core.Session) (string, error) {
+	var err error
 	branch := version
 	tag := true
 	if version == "latest" {
 		branch = "stable"
 		tag = false
 	}
-	err := sess.InitGitClient()
+	sess.Client, err = provider.InitGitClient(sess.Config, sess.Out)
 	if err != nil {
 		return "", err
 	}

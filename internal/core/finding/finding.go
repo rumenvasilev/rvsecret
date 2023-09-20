@@ -1,12 +1,19 @@
-// Package core represents the core functionality of all commands
-package core
+package finding
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/rumenvasilev/rvsecret/internal/pkg/api"
+	"github.com/rumenvasilev/rvsecret/internal/config"
+	"github.com/rumenvasilev/rvsecret/internal/log"
+	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/rumenvasilev/rvsecret/internal/util"
+)
+
+const (
+	githubURL string = "https://github.com"
+	gitlabURL string = "https://gitlab.com"
 )
 
 // Finding is a secret that has been discovered within a target by a discovery method
@@ -31,10 +38,19 @@ type Finding struct {
 	SecretID         string
 }
 
+// Initialize will set the urls and create an ID for inclusion within the finding
+func (f *Finding) Initialize(scanType api.ScanType, gheURL string) error {
+	if f == nil {
+		return errors.New("finding is uninitialized")
+	}
+	f.setupUrls(scanType, gheURL)
+	return nil
+}
+
 // setupUrls will set the urls used to search through either github or gitlab for inclusion in the finding data
-func (f *Finding) setupUrls(sess *Session) {
+func (f *Finding) setupUrls(scanType api.ScanType, gheURL string) {
 	var baseURL string
-	switch sess.Config.Global.ScanType {
+	switch scanType {
 	// case api.GithubEnterprise:
 	// baseURL = sess.GithubEnterpriseURL
 	// SHOULD THIS BE THIS WAY?
@@ -42,16 +58,16 @@ func (f *Finding) setupUrls(sess *Session) {
 	// f.FileURL = fmt.Sprintf("%s/blob/%s/%s", f.RepositoryURL, f.CommitHash, f.FilePath)
 	// f.CommitURL = fmt.Sprintf("%s/commit/%s", f.RepositoryURL, f.CommitHash)
 	case api.Github, api.GithubEnterprise:
-		baseURL = "https://github.com"
+		baseURL = githubURL
 		// TODO: IS THIS CORRECT??
-		if sess.Config.Global.ScanType == api.GithubEnterprise {
-			baseURL = sess.Config.Github.GithubEnterpriseURL
+		if scanType == api.GithubEnterprise {
+			baseURL = gheURL
 		}
 		f.RepositoryURL = fmt.Sprintf("%s/%s/%s", baseURL, f.RepositoryOwner, f.RepositoryName)
 		f.FileURL = fmt.Sprintf("%s/blob/%s/%s", f.RepositoryURL, f.CommitHash, f.FilePath)
 		f.CommitURL = fmt.Sprintf("%s/commit/%s", f.RepositoryURL, f.CommitHash)
 	case "gitlab":
-		baseURL = "https://gitlab.com"
+		baseURL = gitlabURL
 		results := util.CleanURLSpaces(f.RepositoryOwner, f.RepositoryName)
 		f.RepositoryURL = fmt.Sprintf("%s/%s/%s", baseURL, results[0], results[1])
 		f.FileURL = fmt.Sprintf("%s/blob/%s/%s", f.RepositoryURL, f.CommitHash, f.FilePath)
@@ -59,14 +75,8 @@ func (f *Finding) setupUrls(sess *Session) {
 	}
 }
 
-// Initialize will set the urls and create an ID for inclusion within the finding
-func (f *Finding) Initialize(sess *Session) {
-	f.setupUrls(sess)
-}
-
-func (f *Finding) RealtimeOutput(sess *Session) {
-	if !sess.Config.Global.Silent && !sess.Config.Global.CSVOutput && !sess.Config.Global.JSONOutput {
-		log := sess.Out
+func (f *Finding) RealtimeOutput(cfg config.Global, log *log.Logger) {
+	if !cfg.Silent && !cfg.CSVOutput && !cfg.JSONOutput {
 		log.Warn(" %s", strings.ToUpper(f.Description))
 		log.Info("  SignatureID..........: %s", f.SignatureID)
 		log.Info("  Repo.................: %s", f.RepositoryName)

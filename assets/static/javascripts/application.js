@@ -59,6 +59,9 @@ let Finding = Backbone.Model.extend({
     fileContents: function (callback, error) {
         $.ajax({
             url: this.fileContentsUrl(),
+            settings: {
+                beforeSend: sendAuthentication
+            },
             success: callback,
             error: error
         });
@@ -71,6 +74,13 @@ let Findings = Backbone.Collection.extend({
 });
 
 window.findings = new Findings();
+
+let sendAuthentication = function (xhr) {
+    var user = "unknown";
+    var pass = "wh@tev3$#@FDS";
+    var token = user.concat(":", pass);
+    xhr.setRequestHeader('Authorization', ("Bearer ".concat(btoa(token))));
+  }
 
 let StatsView = Backbone.View.extend({
     id: "stats_container",
@@ -109,7 +119,9 @@ let StatsView = Backbone.View.extend({
     },
     startPolling: function () {
         this.pollingTicker = setInterval(function () {
-            statsView.model.fetch();
+            statsView.model.fetch({
+                beforeSend: sendAuthentication
+            });
         }, this.pollingInterval);
     },
     stopPolling: function () {
@@ -265,7 +277,9 @@ let FindingsView = Backbone.View.extend({
             });
     },
     update: function () {
-        this.collection.fetch();
+        this.collection.fetch({
+            beforeSend: sendAuthentication
+        });
     },
     renderFinding: function (finding) {
         var findingEl = new FindingView({model: finding}).render().el;

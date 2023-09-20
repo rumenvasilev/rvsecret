@@ -6,11 +6,21 @@ import (
 
 	"github.com/rumenvasilev/rvsecret/internal/config"
 	"github.com/rumenvasilev/rvsecret/internal/core"
+	"github.com/rumenvasilev/rvsecret/internal/core/banner"
+	"github.com/rumenvasilev/rvsecret/internal/core/provider"
 	"github.com/rumenvasilev/rvsecret/internal/log"
+	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/rumenvasilev/rvsecret/internal/webserver"
 )
 
-func Scan(cfg *config.Config, log *log.Logger) error {
+type Github struct {
+	Cfg *config.Config
+	Log *log.Logger
+}
+
+func (g Github) Do() error {
+	cfg := g.Cfg
+	log := g.Log
 	// create session
 	sess, err := core.NewSessionWithConfig(cfg, log)
 	if err != nil {
@@ -31,7 +41,7 @@ func Scan(cfg *config.Config, log *log.Logger) error {
 
 	// By default we display a header to the user giving basic info about application. This will not be displayed
 	// during a silent run which is the default when using this in an automated fashion.
-	core.HeaderInfo(*cfg, sess.State.Stats.StartedAt.Format(time.RFC3339), sess.Out)
+	banner.HeaderInfo(cfg.Global, sess.State.Stats.StartedAt.Format(time.RFC3339), sess.Out)
 
 	if cfg.Global.Debug {
 		fmt.Println("Global debug set to", cfg.Global.Debug)
@@ -43,7 +53,7 @@ func Scan(cfg *config.Config, log *log.Logger) error {
 	log.Debug("We have these repos: %s", sess.GithubUserRepos)
 
 	//Create a github client to be used for the session
-	err = sess.InitGitClient()
+	sess.Client, err = provider.InitGitClient(sess.Config, log)
 	if err != nil {
 		return err
 	}
@@ -86,3 +96,5 @@ func Scan(cfg *config.Config, log *log.Logger) error {
 	}
 	return nil
 }
+
+var _ api.Scanner = (*Github)(nil)

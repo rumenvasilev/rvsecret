@@ -102,7 +102,7 @@ func updateSignatures(rRepo string, sess *core.Session, log *log.Logger) bool {
 	}
 
 	// if the signatures path does not exist then we create it
-	if !util.PathExists(home, log) {
+	if !util.PathExists(home) {
 		err := os.MkdirAll(home, 0700)
 		if err != nil {
 			log.Error(err.Error())

@@ -105,12 +105,12 @@ func AppendIfMissing(slice []string, s string) []string {
 // AppendToSlice will append additional items to slice if not present already and return a new slice
 // additional trim support is present, if necessary
 func AppendToSlice(trim bool, input, target []string) []string {
-	var result []string
+	result := target
 	for _, v := range input {
 		if trim {
 			v = strings.TrimSpace(v)
 		}
-		result = AppendIfMissing(target, v)
+		result = AppendIfMissing(result, v)
 	}
 	return result
 }

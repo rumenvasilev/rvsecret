@@ -6,7 +6,7 @@ import (
 
 	"github.com/rumenvasilev/rvsecret/internal/config"
 	"github.com/rumenvasilev/rvsecret/internal/log"
-	"github.com/rumenvasilev/rvsecret/internal/pkg/api"
+	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 	"gopkg.in/yaml.v3"
 )
@@ -32,7 +32,7 @@ func SaveConfig(log *log.Logger) error {
 	fmt.Println(string(bytes))
 
 	//homedir
-	dir, err := util.MakeHomeDir(filepath.Dir(cfg.Global.ConfigFile), log)
+	dir, err := util.MakeHomeDir(filepath.Dir(cfg.Global.ConfigFile))
 	if err != nil {
 		return err
 	}

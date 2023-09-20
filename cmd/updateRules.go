@@ -3,7 +3,7 @@ package cmd
 import (
 	"github.com/rumenvasilev/rvsecret/internal/config"
 	"github.com/rumenvasilev/rvsecret/internal/log"
-	"github.com/rumenvasilev/rvsecret/internal/pkg/api"
+	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/signatures"
 
 	"github.com/spf13/cobra"

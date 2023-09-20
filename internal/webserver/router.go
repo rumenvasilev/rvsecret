@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/gin-contrib/logger"
 	"github.com/gin-contrib/secure"
@@ -15,7 +16,7 @@ import (
 	"github.com/rumenvasilev/rvsecret/internal/config"
 	"github.com/rumenvasilev/rvsecret/internal/core"
 	"github.com/rumenvasilev/rvsecret/internal/log"
-	"github.com/rumenvasilev/rvsecret/internal/pkg/api"
+	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 )
 
@@ -27,6 +28,7 @@ const (
 	CspPolicy       = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'"
 	ReferrerPolicy  = "no-referrer"
 	local           = "add/path/here"
+	authorization   = "dW5rbm93bjp3aEB0ZXYzJCNARkRT"
 )
 
 // Start will configure and start the webserver for graphical output and status messages
@@ -75,16 +77,16 @@ func New(cfg config.Config, state *core.State, log *log.Logger) *Engine {
 	router.GET("/javascripts/*path", rewrite{uri: "/javascripts"}.path(router))
 	router.GET("/fonts/*path", rewrite{uri: "/fonts"}.path(router))
 	router.GET("/stylesheets/*path", rewrite{uri: "/stylesheets"}.path(router))
-	router.GET("/api/stats", func(c *gin.Context) {
+	router.GET("/api/stats", checkAuthN, func(c *gin.Context) {
 		c.JSON(200, state.Stats)
 	})
-	router.GET("/api/findings", func(c *gin.Context) {
+	router.GET("/api/findings", checkAuthN, func(c *gin.Context) {
 		c.JSON(200, state.Findings)
 	})
-	router.GET("/api/targets", func(c *gin.Context) {
+	router.GET("/api/targets", checkAuthN, func(c *gin.Context) {
 		c.JSON(200, state.Targets)
 	})
-	router.GET("/api/repositories", func(c *gin.Context) {
+	router.GET("/api/repositories", checkAuthN, func(c *gin.Context) {
 		c.JSON(200, state.Repositories)
 	})
 	router.GET("/api/files/:owner/:repo/:commit/*path", fetch{scanType: cfg.Global.ScanType}.file)
@@ -93,6 +95,25 @@ func New(cfg config.Config, state *core.State, log *log.Logger) *Engine {
 		Listener: fmt.Sprintf("%s:%d", cfg.Global.BindAddress, cfg.Global.BindPort),
 		Logger:   log,
 		Engine:   router,
+	}
+}
+
+func checkAuthN(c *gin.Context) {
+	authHeader := c.Request.Header.Get("Authorization")
+	if authHeader == "" {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	bearer := strings.Split(authHeader, "Bearer ")
+	if len(bearer) != 2 {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	if bearer[1] != authorization {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
 	}
 }
 
@@ -172,6 +193,11 @@ func getRemoteFile(c *gin.Context, filepath string) {
 }
 
 func getLocalFile(c *gin.Context, filepath string) {
+	// Handle auth separately, because we don't need any for remote files
+	checkAuthN(c)
+	if c.IsAborted() {
+		return
+	}
 	// defer resp.Body.Close()
 	data, err := os.Open(filepath)
 	//lint:ignore SA5001 ignore this

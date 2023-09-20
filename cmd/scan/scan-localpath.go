@@ -5,8 +5,8 @@ package scan
 import (
 	"github.com/rumenvasilev/rvsecret/internal/config"
 	"github.com/rumenvasilev/rvsecret/internal/log"
-	"github.com/rumenvasilev/rvsecret/internal/pkg"
-	"github.com/rumenvasilev/rvsecret/internal/pkg/api"
+	"github.com/rumenvasilev/rvsecret/internal/pkg/scan"
+	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -22,7 +22,7 @@ var scanLocalPathCmd = &cobra.Command{
 			return err
 		}
 		log := log.NewLogger(cfg.Global.Debug, cfg.Global.Silent)
-		return pkg.Scan(cfg, log)
+		return scan.New(cfg, log).Do()
 	},
 }
 

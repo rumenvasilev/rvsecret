@@ -1,16 +1,24 @@
-package gitlab
+package localgit
 
 import (
 	"time"
 
 	"github.com/rumenvasilev/rvsecret/internal/config"
 	"github.com/rumenvasilev/rvsecret/internal/core"
+	"github.com/rumenvasilev/rvsecret/internal/core/banner"
 	"github.com/rumenvasilev/rvsecret/internal/log"
+	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/rumenvasilev/rvsecret/internal/webserver"
-	"github.com/spf13/viper"
 )
 
-func Scan(cfg *config.Config, log *log.Logger) error {
+type LocalGit struct {
+	Cfg *config.Config
+	Log *log.Logger
+}
+
+func (l LocalGit) Do() error {
+	cfg := l.Cfg
+	log := l.Log
 	// create session
 	sess, err := core.NewSessionWithConfig(cfg, log)
 	if err != nil {
@@ -23,28 +31,30 @@ func Scan(cfg *config.Config, log *log.Logger) error {
 		go ws.Start()
 	}
 
+	log.Debug("We have these repo paths: %s", cfg.Local.Repos)
+
+	if cfg.Global.Debug {
+		log.Debug(config.PrintDebug(sess.SignatureVersion))
+	}
+
 	// By default we display a header to the user giving basic info about application. This will not be displayed
 	// during a silent run which is the default when using this in an automated fashion.
-	core.HeaderInfo(*cfg, sess.State.Stats.StartedAt.Format(time.RFC3339), log)
+	banner.HeaderInfo(cfg.Global, sess.State.Stats.StartedAt.Format(time.RFC3339), log)
 
-	cfg.GitlabAccessToken = viper.GetString("gitlab-api-token")
-
-	err = sess.InitGitClient()
+	err = core.GatherLocalRepositories(sess)
 	if err != nil {
 		return err
 	}
-
-	core.GatherTargets(sess)
-	core.GatherGitlabRepositories(sess)
 	core.AnalyzeRepositories(sess, sess.State.Stats, log)
 	sess.Finish()
 
 	core.SummaryOutput(sess)
 
 	if cfg.Global.WebServer && !cfg.Global.Silent {
-		log.Important("%s", core.ASCIIBanner)
 		log.Important("Press Ctrl+C to stop web server and exit.")
 		select {}
 	}
 	return nil
 }
+
+var _ api.Scanner = (*LocalGit)(nil)

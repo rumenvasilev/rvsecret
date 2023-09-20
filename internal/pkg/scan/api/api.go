@@ -11,3 +11,7 @@ const (
 	Unknown          ScanType = "unknown" // for testing
 	UpdateSignatures ScanType = "update-signatures"
 )
+
+type Scanner interface {
+	Do() error
+}

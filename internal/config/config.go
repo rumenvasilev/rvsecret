@@ -7,7 +7,7 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/mitchellh/go-homedir"
-	"github.com/rumenvasilev/rvsecret/internal/pkg/api"
+	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 	"github.com/rumenvasilev/rvsecret/version"
 	"github.com/spf13/cobra"
@@ -21,42 +21,42 @@ var cfg *Config
 
 // defaultIgnoreExtensions is an array of extensions that if they match a file that file will be excluded
 var defaultIgnoreExtensions = []string{"jpg", "jpeg", "png", "gif", "bmp", "tiff",
-	"tif", "psd", "xcf"}
+	"tif", "psd", "xcf", "pdf"}
 
 // defaultIgnorePaths is an array of directories that will be excluded from all types of scans.
 var defaultIgnorePaths = []string{"node_modules/", "vendor/bundle", "vendor/cache", "/proc/"}
 
 type Config struct {
-	Signatures Signatures `mapstructure:"signatures" yaml:"signatures"`
 	Github     Github     `mapstructure:"github" yaml:"github"`
-	Gitlab     `mapstructure:"gitlab" yaml:"gitlab"`
-	Global     Global `mapstructure:"global" yaml:"global"`
-	Local      Local  `mapstructure:"local" yaml:"local"`
+	Local      Local      `mapstructure:"local" yaml:"local"`
+	Signatures Signatures `mapstructure:"signatures" yaml:"signatures"`
+
+	Gitlab `mapstructure:"gitlab" yaml:"gitlab"`
+	Global Global `mapstructure:"global" yaml:"global"`
 }
 
 type Global struct {
-	AppVersion  string       `yaml:"-"`
-	BindAddress string       `mapstructure:"bind-address" yaml:"bind-address"`
-	ConfigFile  string       `mapstructure:"config-file" yaml:"-"`
-	ScanType    api.ScanType `mapstructure:"scan-type" yaml:"-"`
-	// LocalPaths      []string     `mapstructure:"paths" yaml:"paths"`
-	SkippableExt    []string `mapstructure:"ignore-extension" yaml:"ignore-extension"`
-	SkippablePath   []string `mapstructure:"ignore-path" yaml:"ignore-path"`
-	BindPort        int      `mapstructure:"bind-port" yaml:"bind-port"`
-	CommitDepth     int      `mapstructure:"commit-depth" yaml:"commit-depth"`
-	ConfidenceLevel int      `mapstructure:"confidence-level" yaml:"confidence-level"`
-	MaxFileSize     int64    `mapstructure:"max-file-size" yaml:"max-file-size"`
-	Threads         int      `mapstructure:"num-threads" yaml:"num-threads"`
-	CSVOutput       bool     `mapstructure:"csv"`
-	Debug           bool     `mapstructure:"debug"`
-	ExpandOrgs      bool     `mapstructure:"expand-orgs" yaml:"expand-orgs"`
-	HideSecrets     bool     `mapstructure:"hide-secrets" yaml:"hide-secrets"`
-	InMemClone      bool     `mapstructure:"in-mem-clone" yaml:"in-mem-clone"`
-	JSONOutput      bool     `mapstructure:"json"`
-	ScanFork        bool     `mapstructure:"scan-forks" yaml:"scan-forks"`
-	ScanTests       bool     `mapstructure:"scan-tests" yaml:"scan-tests"`
-	Silent          bool     `mapstructure:"silent"`
-	WebServer       bool     `mapstructure:"web-server" yaml:"web-server"`
+	AppVersion      string       `yaml:"-"`
+	BindAddress     string       `mapstructure:"bind-address" yaml:"bind-address"`
+	ConfigFile      string       `mapstructure:"config-file" yaml:"-"`
+	ScanType        api.ScanType `mapstructure:"scan-type" yaml:"-"`
+	SkippableExt    []string     `mapstructure:"ignore-extension" yaml:"ignore-extension"`
+	SkippablePath   []string     `mapstructure:"ignore-path" yaml:"ignore-path"`
+	BindPort        int          `mapstructure:"bind-port" yaml:"bind-port"`
+	CommitDepth     int          `mapstructure:"commit-depth" yaml:"commit-depth"`
+	ConfidenceLevel int          `mapstructure:"confidence-level" yaml:"confidence-level"`
+	MaxFileSize     int64        `mapstructure:"max-file-size" yaml:"max-file-size"`
+	Threads         int          `mapstructure:"num-threads" yaml:"num-threads"`
+	CSVOutput       bool         `mapstructure:"csv"`
+	Debug           bool         `mapstructure:"debug"`
+	ExpandOrgs      bool         `mapstructure:"expand-orgs" yaml:"expand-orgs"`
+	HideSecrets     bool         `mapstructure:"hide-secrets" yaml:"hide-secrets"`
+	InMemClone      bool         `mapstructure:"in-mem-clone" yaml:"in-mem-clone"`
+	JSONOutput      bool         `mapstructure:"json"`
+	ScanFork        bool         `mapstructure:"scan-forks" yaml:"scan-forks"`
+	ScanTests       bool         `mapstructure:"scan-tests" yaml:"scan-tests"`
+	Silent          bool         `mapstructure:"silent"`
+	WebServer       bool         `mapstructure:"web-server" yaml:"web-server"`
 	_               [6]byte
 }
 

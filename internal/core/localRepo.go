@@ -17,7 +17,7 @@ import (
 // GatherLocalRepositories will grab all the local repos from the user input and generate a repository
 // object, putting dummy or generated values in where necessary.
 func GatherLocalRepositories(sess *Session) error {
-	log := sess.Out
+	// log := sess.Out
 	// This is the number of targets as we don't do forks or anything else.
 	// It will contain directories, that will then be added to the repo count
 	// if they contain a .git directory
@@ -27,7 +27,7 @@ func GatherLocalRepositories(sess *Session) error {
 
 	for _, pth := range sess.Config.Local.Repos {
 
-		if !util.PathExists(pth, log) {
+		if !util.PathExists(pth) {
 			return fmt.Errorf("[*] <%s> does not exist! Quitting", pth)
 		}
 

@@ -16,16 +16,18 @@ import (
 	"github.com/google/go-github/github"
 	"github.com/rumenvasilev/rvsecret/internal/config"
 	_coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
-	"github.com/rumenvasilev/rvsecret/internal/core/provider"
+	"github.com/rumenvasilev/rvsecret/internal/core/finding"
+	providerAPI "github.com/rumenvasilev/rvsecret/internal/core/provider/api"
+	"github.com/rumenvasilev/rvsecret/internal/core/signatures"
 	"github.com/rumenvasilev/rvsecret/internal/log"
-	"github.com/rumenvasilev/rvsecret/internal/pkg/api"
+	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/rumenvasilev/rvsecret/internal/stats"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 )
 
 // Session contains all the necessary values and parameters used during a scan
 type Session struct {
-	Client           provider.IClient `json:"-"` // Client holds the client for the target git server (github, gitlab)
+	Client           providerAPI.IClient `json:"-"` // Client holds the client for the target git server (github, gitlab)
 	Config           *config.Config
 	State            *State
 	Out              *log.Logger `json:"-"`
@@ -36,13 +38,13 @@ type Session struct {
 	GithubUserOrgs   []string
 	GithubUserRepos  []string
 	Organizations    []*github.Organization
-	Signatures       []*Signature
+	Signatures       []*signatures.Signature
 }
 
 type State struct {
 	*sync.Mutex
 	Stats        *stats.Stats
-	Findings     []*Finding
+	Findings     []*finding.Finding
 	Targets      []*_coreapi.Owner
 	Repositories []*_coreapi.Repository
 }
@@ -74,12 +76,8 @@ func (s *Session) Initialize(cfg *config.Config, log *log.Logger) error {
 
 	s.InitThreads()
 
-	// if !s.Silent && s.WebServer {
-	// 	s.InitRouter()
-	// }
-
-	var curSig []Signature
-	var combinedSig []Signature
+	var curSig []signatures.Signature
+	var combinedSig []signatures.Signature
 
 	// signaturessss
 	// TODO need to catch this error here
@@ -89,14 +87,15 @@ func (s *Session) Initialize(cfg *config.Config, log *log.Logger) error {
 	if err != nil {
 		return err
 	}
-	if util.PathExists(h, s.Out) {
-		curSig, err = LoadSignatures(h, cfg.Global.ConfidenceLevel, s)
+	if util.PathExists(h) {
+		curSig, s.SignatureVersion, err = signatures.Load(h, cfg.Global.ConfidenceLevel)
 		if err != nil {
 			return err
 		}
 		combinedSig = append(combinedSig, curSig...)
 	}
-	Signatures = combinedSig
+	// FIXME: updating global var in another pkg
+	signatures.Signatures = combinedSig
 	return nil
 }
 
@@ -136,7 +135,7 @@ func (s *Session) AddRepository(repository *_coreapi.Repository) {
 
 // AddFinding will add a finding that has been discovered during a session to the list of findings
 // for that session
-func (s *Session) AddFinding(finding *Finding) {
+func (s *Session) AddFinding(finding *finding.Finding) {
 	s.State.Lock()
 	defer s.State.Unlock()
 	// const MaxStrLen = 100

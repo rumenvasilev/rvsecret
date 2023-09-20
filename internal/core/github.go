@@ -16,6 +16,8 @@ import (
 	"github.com/rumenvasilev/rvsecret/internal/util"
 )
 
+const retrievedRepoFromUser string = " Retrieved repository %s from user %s"
+
 // addUser will add a new user to the sess for further scanning and analyzing
 func (s *Session) addUser(user *_coreapi.Owner) {
 	s.State.Lock()
@@ -135,14 +137,14 @@ func GatherGithubRepositoriesFromOwner(sess *Session) error {
 			for _, r := range sess.GithubUserRepos {
 				log.Debug("current repo: %s, comparing to: %s", r, repo.Name)
 				if r == repo.Name {
-					log.Debug(" Retrieved repository %s from user %s", repo.FullName, repo.Owner)
+					log.Debug(retrievedRepoFromUser, repo.FullName, repo.Owner)
 					// Add the repo to the sess to be scanned
 					sess.AddRepository(repo)
 				}
 			}
 			continue
 		}
-		log.Debug(" Retrieved repository %s from user %s", repo.FullName, repo.Owner)
+		log.Debug(retrievedRepoFromUser, repo.FullName, repo.Owner)
 
 		// If we are not doing any filtering and simply grabbing all available repos we add the repos
 		// to the session to be scanned
@@ -336,13 +338,13 @@ func GatherOrgsMembersRepositories(sess *Session) {
 		if sess.GithubUserRepos != nil {
 			for _, r := range sess.GithubUserRepos {
 				if r == repo.Name {
-					sess.Out.Debug(" Retrieved repository %s from user %s", repo.FullName, repo.Owner)
+					sess.Out.Debug(retrievedRepoFromUser, repo.FullName, repo.Owner)
 					sess.AddRepository(repo)
 				}
 			}
 			continue
 		} else {
-			sess.Out.Debug(" Retrieved repository %s from user %s", repo.FullName, repo.Owner)
+			sess.Out.Debug(retrievedRepoFromUser, repo.FullName, repo.Owner)
 			sess.AddRepository(repo)
 		}
 	}
