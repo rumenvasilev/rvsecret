@@ -24,7 +24,7 @@ func InitGitClient(cfg *config.Config, log *log.Logger) (api.IClient, error) {
 	case scanAPI.Gitlab:
 		// TODO need to add in the bits to parse the url here as well
 		// TODO set this to some sort of consistent client, look to github for ideas
-		return gitlab.NewClient(cfg.GitlabAccessToken, log)
+		return gitlab.NewClient(cfg.Gitlab.APIToken, log)
 	case scanAPI.UpdateSignatures:
 		return github.NewClient(cfg.Signatures.APIToken, "", log)
 	default:

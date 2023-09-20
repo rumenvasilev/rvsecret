@@ -80,7 +80,7 @@ func cloneRepositoryWrapper(cfg *config.Config, repo _coreapi.Repository) (*git.
 			// Token:      , // TODO Is this need since we already have a client?
 		}
 		auth.Username = "oauth2"
-		auth.Password = cfg.GitlabAccessToken
+		auth.Password = cfg.Gitlab.APIToken
 	case api.LocalGit:
 		cloneConfig = CloneConfiguration{
 			URL:        repo.CloneURL,

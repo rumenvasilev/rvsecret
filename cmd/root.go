@@ -14,12 +14,17 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	signaturesFile string = "signatures-file"
+	signaturesPath string = "signatures-path"
+)
+
 var (
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd = &cobra.Command{
 		Use:   "rvsecret",
 		Short: "A tool to scan for secrets in various digital hiding spots",
-		Long:  "A tool to scan for secrets in various digital hiding spots - v" + version.AppVersion(), // TODO write a better long description
+		Long:  "A tool to scan for secrets in various digital hiding spots - v" + version.AppVersion(),
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			config.SetConfig(cmd)
 		},
@@ -41,9 +46,9 @@ func init() {
 	viper.BindPFlag("global.debug", rootCmd.PersistentFlags().Lookup("debug")) //nolint:errcheck
 	rootCmd.PersistentFlags().String("config-file", config.DefaultConfig.Global.ConfigFile, "Config file location")
 	viper.BindPFlag("global.config-file", rootCmd.PersistentFlags().Lookup("config-file")) //nolint:errcheck
-	rootCmd.PersistentFlags().String("signatures-file", config.DefaultConfig.Signatures.File, "file(s) containing detection signatures.")
-	viper.BindPFlag("signatures.file", rootCmd.PersistentFlags().Lookup("signatures-file")) //nolint:errcheck
-	rootCmd.PersistentFlags().String("signatures-path", config.DefaultConfig.Signatures.Path, "path containing detection signatures.")
-	rootCmd.MarkFlagsMutuallyExclusive("signatures-file", "signatures-path")
-	viper.BindPFlag("signatures.path", rootCmd.PersistentFlags().Lookup("signatures-path")) //nolint:errcheck
+	rootCmd.PersistentFlags().String(signaturesFile, config.DefaultConfig.Signatures.File, "file(s) containing detection signatures.")
+	viper.BindPFlag("signatures.file", rootCmd.PersistentFlags().Lookup(signaturesFile)) //nolint:errcheck
+	rootCmd.PersistentFlags().String(signaturesPath, config.DefaultConfig.Signatures.Path, "path containing detection signatures.")
+	rootCmd.MarkFlagsMutuallyExclusive(signaturesFile, signaturesPath)
+	viper.BindPFlag("signatures.path", rootCmd.PersistentFlags().Lookup(signaturesPath)) //nolint:errcheck
 }

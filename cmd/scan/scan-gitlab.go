@@ -29,7 +29,8 @@ var scanGitlabCmd = &cobra.Command{
 func init() {
 	ScanCmd.AddCommand(scanGitlabCmd)
 	// scanGitlabCmd.Flags().Bool("add-org-members", false, "Add members to targets when processing organizations")
-	scanGitlabCmd.Flags().StringP("gitlab-api-token", "t", "", "API token for access to gitlab, see doc for necessary scope")
-	scanGitlabCmd.Flags().StringSlice("gitlab-projects", config.DefaultConfig.Gitlab.GitlabTargets, "List of Gitlab projects or users to scan")
-	viper.BindPFlags(scanGitlabCmd.Flags()) //nolint:errcheck
+	scanGitlabCmd.Flags().StringP("api-token", "t", "", "API token for access to gitlab, see doc for necessary scope")
+	viper.BindPFlag("gitlab.api-token", scanGitlabCmd.Flags().Lookup("api-token")) //nolint:errcheck
+	scanGitlabCmd.Flags().StringSlice("projects", config.DefaultConfig.Gitlab.Targets, "List of Gitlab projects or users to scan")
+	viper.BindPFlag("gitlab.projects", scanGitlabCmd.Flags().Lookup("projects")) //nolint:errcheck
 }

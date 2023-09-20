@@ -23,7 +23,7 @@ func GatherTargets(sess *Session) {
 	//case "github":
 	//	targets = sess.GithubTargets
 	//case "gitlab":
-	targets := sess.Config.GitlabTargets
+	targets := sess.Config.Gitlab.Targets
 	//}
 
 	//var target *Owner

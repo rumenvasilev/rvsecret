@@ -18,7 +18,8 @@ import (
 
 const retrievedRepoFromUser string = " Retrieved repository %s from user %s"
 
-// addUser will add a new user to the sess for further scanning and analyzing
+// addUser will add a new user to the sess for further scanning and analyzing.
+// It will also bump the stats.
 func (s *Session) addUser(user *_coreapi.Owner) {
 	s.State.Lock()
 	defer s.State.Unlock()
@@ -38,6 +39,9 @@ func (s *Session) addUser(user *_coreapi.Owner) {
 		}
 	}
 	s.GithubUsers = append(s.GithubUsers, user)
+
+	// bump stats
+	s.State.Stats.IncrementUsers()
 }
 
 // GatherUsers will generate a list of users from github.com that can then be filtered down to a specific target range
@@ -54,7 +58,6 @@ func GatherUsers(sess *Session) error {
 
 		// Add the user to the session and increment the user count
 		sess.addUser(owner)
-		sess.State.Stats.IncrementUsers()
 		log.Debug("Added user %s", *owner.Login)
 	}
 	if len(sess.GithubUsers) == 0 {
@@ -133,15 +136,10 @@ func GatherGithubRepositoriesFromOwner(sess *Session) error {
 	for _, repo := range allRepos {
 		// Increment the total number of repos found, regardless if we are cloning them
 		sess.State.Stats.IncrementRepositoriesTotal()
-		if sess.GithubUserRepos != nil {
-			for _, r := range sess.GithubUserRepos {
-				log.Debug("current repo: %s, comparing to: %s", r, repo.Name)
-				if r == repo.Name {
-					log.Debug(retrievedRepoFromUser, repo.FullName, repo.Owner)
-					// Add the repo to the sess to be scanned
-					sess.AddRepository(repo)
-				}
-			}
+		if sess.GithubUserRepos != nil && isFilteredRepo(repo.Name, sess.GithubUserRepos) {
+			log.Debug(retrievedRepoFromUser, repo.FullName, repo.Owner)
+			// Add the repo to the sess to be scanned
+			sess.AddRepository(repo)
 			continue
 		}
 		log.Debug(retrievedRepoFromUser, repo.FullName, repo.Owner)
@@ -211,7 +209,6 @@ func GatherOrgs(sess *Session, log *log.Logger) error {
 	// Add the orgs to the list for later enumeration of repos
 	for _, org := range orgList {
 		sess.addOrganization(org)
-		sess.State.Stats.IncrementOrgs()
 		log.Debug("Added org %s", *org.Login)
 	}
 	return nil
@@ -240,7 +237,8 @@ func ownerToOrg(owner *_coreapi.Owner) *github.Organization {
 	}
 }
 
-// addOrganization will add a new organization to the session for further scanning and analyzing
+// addOrganization will add a new organization to the session for further scanning and analyzing.
+// It will also bump the stats.
 func (s *Session) addOrganization(organization *github.Organization) {
 	s.State.Lock()
 	defer s.State.Unlock()
@@ -260,6 +258,8 @@ func (s *Session) addOrganization(organization *github.Organization) {
 		}
 	}
 	s.Organizations = append(s.Organizations, organization)
+
+	s.State.Stats.IncrementOrgs()
 }
 
 // GatherGithubOrgRepositories will gather all the repositories for a given org.
@@ -302,11 +302,8 @@ func GatherOrgsMembersRepositories(sess *Session) {
 	var allRepos []*_coreapi.Repository
 	log := sess.Out
 
-	sess.Out.Important("Gathering users from orgs...")
+	log.Important("Gathering users from orgs...")
 	ctx := context.Background()
-
-	// optMember := &github.ListMembersOptions{}
-	// optRepo := &github.RepositoryListOptions{}
 
 	// TODO multi thread this
 	for _, o := range sess.Organizations {
@@ -315,11 +312,10 @@ func GatherOrgsMembersRepositories(sess *Session) {
 		})
 		// Log error and continue with the next org
 		if err != nil {
-			sess.Out.Warn("%v", err)
+			log.Warn("%v", err)
 		}
 		for _, v := range members {
 			sess.addUser(v)
-			sess.State.Stats.IncrementUsers()
 			log.Debug("Added user %s", *v.Login)
 			// find all repositories
 			allRepos, err = sess.Client.GetRepositoriesFromOwner(ctx, *v)
@@ -338,13 +334,13 @@ func GatherOrgsMembersRepositories(sess *Session) {
 		if sess.GithubUserRepos != nil {
 			for _, r := range sess.GithubUserRepos {
 				if r == repo.Name {
-					sess.Out.Debug(retrievedRepoFromUser, repo.FullName, repo.Owner)
+					log.Debug(retrievedRepoFromUser, repo.FullName, repo.Owner)
 					sess.AddRepository(repo)
 				}
 			}
 			continue
 		} else {
-			sess.Out.Debug(retrievedRepoFromUser, repo.FullName, repo.Owner)
+			log.Debug(retrievedRepoFromUser, repo.FullName, repo.Owner)
 			sess.AddRepository(repo)
 		}
 	}

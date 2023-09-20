@@ -31,7 +31,7 @@ type Config struct {
 	Local      Local      `mapstructure:"local" yaml:"local"`
 	Signatures Signatures `mapstructure:"signatures" yaml:"signatures"`
 
-	Gitlab `mapstructure:"gitlab" yaml:"gitlab"`
+	Gitlab Gitlab `mapstructure:"gitlab" yaml:"gitlab"`
 	Global Global `mapstructure:"global" yaml:"global"`
 }
 
@@ -83,9 +83,9 @@ type Github struct {
 }
 
 type Gitlab struct {
-	GitlabAccessToken string   `mapstructure:"gitlab-api-token"`
-	GitlabTargets     []string `mapstructure:"gitlab-targets"`
-	_                 [24]byte
+	APIToken string   `mapstructure:"api-token" yaml:"api-token"`
+	Targets  []string `mapstructure:"projects" yaml:"projects"`
+	_        [24]byte
 }
 
 type Local struct {
@@ -164,6 +164,10 @@ func Load(scanType api.ScanType) (*Config, error) {
 	case api.UpdateSignatures:
 		if cfg.Signatures.APIToken == "" {
 			return nil, errors.New("APIToken for Github is not set")
+		}
+	case api.Gitlab:
+		if cfg.Gitlab.APIToken == "" {
+			return nil, errors.New("APIToken for Gitlab is not set")
 		}
 	}
 	return cfg, nil

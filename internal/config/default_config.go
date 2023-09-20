@@ -17,7 +17,7 @@ var github = Github{
 }
 
 var gitlab = Gitlab{
-	GitlabTargets: nil,
+	Targets: nil,
 }
 
 var global = Global{

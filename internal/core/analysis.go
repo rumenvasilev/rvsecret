@@ -168,7 +168,6 @@ func (sess *Session) isDirtyCommit(commit *object.Commit, repo _coreapi.Reposito
 		fPath := _git.GetChangePath(change)
 
 		// TODO Add an example of this
-		// FIXME This is where I have tracked the in-mem-clone issue to
 		fullFilePath := path + "/" + fPath
 
 		// Break a file name up into its composite pieces including the extension and base name

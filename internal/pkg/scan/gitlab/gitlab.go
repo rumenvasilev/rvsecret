@@ -10,7 +10,6 @@ import (
 	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/rumenvasilev/rvsecret/internal/webserver"
-	"github.com/spf13/viper"
 )
 
 type Gitlab struct {
@@ -36,8 +35,6 @@ func (g Gitlab) Do() error {
 	// By default we display a header to the user giving basic info about application. This will not be displayed
 	// during a silent run which is the default when using this in an automated fashion.
 	banner.HeaderInfo(cfg.Global, sess.State.Stats.StartedAt.Format(time.RFC3339), log)
-
-	cfg.GitlabAccessToken = viper.GetString("gitlab-api-token")
 
 	sess.Client, err = provider.InitGitClient(sess.Config, log)
 	if err != nil {
