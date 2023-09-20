@@ -136,16 +136,19 @@ func GatherGithubRepositoriesFromOwner(sess *Session) error {
 	for _, repo := range allRepos {
 		// Increment the total number of repos found, regardless if we are cloning them
 		sess.State.Stats.IncrementRepositoriesTotal()
-		if sess.GithubUserRepos != nil && isFilteredRepo(repo.Name, sess.GithubUserRepos) {
-			log.Debug(retrievedRepoFromUser, repo.FullName, repo.Owner)
-			// Add the repo to the sess to be scanned
-			sess.AddRepository(repo)
+		if sess.GithubUserRepos != nil {
+			if isFilteredRepo(repo.Name, sess.GithubUserRepos) {
+				log.Debug(retrievedRepoFromUser, repo.FullName, repo.Owner)
+				// Add the repo to the sess to be scanned
+				sess.AddRepository(repo)
+			}
 			continue
 		}
 		log.Debug(retrievedRepoFromUser, repo.FullName, repo.Owner)
 
 		// If we are not doing any filtering and simply grabbing all available repos we add the repos
 		// to the session to be scanned
+		log.Debug("Adding repo %s", repo.Name)
 		sess.AddRepository(repo)
 	}
 	return nil

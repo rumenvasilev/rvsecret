@@ -23,6 +23,15 @@ const (
 	PartContent   = "content"   // the content of the file
 )
 
+type signatureKind int
+
+const (
+	_ signatureKind = iota
+	simpleKind
+	patternKind
+	safeFunctionKind
+)
+
 // WARNING, GLOBAL VAR!
 // Signatures holds a list of all signatures used during the session
 var Signatures []Signature
@@ -152,48 +161,27 @@ func Load(filePath string, mLevel int) ([]Signature, string, error) { // TODO we
 	var SimpleSignatures []SimpleSignature
 	var PatternSignatures []PatternSignature
 	for _, curSig := range c.SimpleSignatures {
-		if curSig.Enable > 0 && curSig.ConfidenceLevel >= mLevel {
-			SimpleSignatures = append(SimpleSignatures, SimpleSignature{
-				comment:         curSig.Comment,
-				description:     curSig.Description,
-				match:           curSig.Match,
-				part:            getPart(curSig),
-				signatureid:     curSig.SignatureID,
-				enable:          curSig.Enable,
-				entropy:         curSig.Entropy,
-				confidenceLevel: curSig.ConfidenceLevel,
-			})
+		res, ok := processSignatures(curSig, mLevel, simpleKind).(SimpleSignature)
+		if res == (SimpleSignature{}) || !ok {
+			continue
 		}
+		SimpleSignatures = append(SimpleSignatures, res)
 	}
 
 	for _, curSig := range c.PatternSignatures {
-		if curSig.Enable > 0 && curSig.ConfidenceLevel >= mLevel {
-			PatternSignatures = append(PatternSignatures, PatternSignature{
-				match:           regexp.MustCompile(curSig.Match),
-				comment:         curSig.Comment,
-				description:     curSig.Description,
-				part:            getPart(curSig),
-				signatureid:     curSig.SignatureID,
-				enable:          curSig.Enable,
-				entropy:         curSig.Entropy,
-				confidenceLevel: curSig.ConfidenceLevel,
-			})
+		res, ok := processSignatures(curSig, mLevel, patternKind).(PatternSignature)
+		if res == (PatternSignature{}) || !ok {
+			continue
 		}
+		PatternSignatures = append(PatternSignatures, res)
 	}
 
 	for _, curSig := range c.SafeFunctionSignatures {
-		if curSig.Enable > 0 && curSig.ConfidenceLevel >= mLevel {
-			SafeFunctionSignatures = append(SafeFunctionSignatures, SafeFunctionSignature{
-				match:           regexp.MustCompile(curSig.Match),
-				comment:         curSig.Comment,
-				description:     curSig.Description,
-				part:            getPart(curSig),
-				signatureid:     curSig.SignatureID,
-				enable:          curSig.Enable,
-				entropy:         curSig.Entropy,
-				confidenceLevel: curSig.ConfidenceLevel,
-			})
+		res, ok := processSignatures(curSig, mLevel, safeFunctionKind).(SafeFunctionSignature)
+		if res == (SafeFunctionSignature{}) || !ok {
+			continue
 		}
+		SafeFunctionSignatures = append(SafeFunctionSignatures, res)
 	}
 
 	idx := len(PatternSignatures) + len(SimpleSignatures)
@@ -213,6 +201,47 @@ func Load(filePath string, mLevel int) ([]Signature, string, error) { // TODO we
 	// TODO are we loading the safe ones somewhere
 
 	return Signatures, signaturesVersion, nil
+}
+
+func processSignatures(curSig SignatureDef, mLevel int, kind signatureKind) interface{} {
+	if curSig.Enable > 0 && curSig.ConfidenceLevel >= mLevel {
+		switch kind {
+		case simpleKind:
+			return SimpleSignature{
+				match:           curSig.Match,
+				comment:         curSig.Comment,
+				description:     curSig.Description,
+				part:            getPart(curSig),
+				signatureid:     curSig.SignatureID,
+				enable:          curSig.Enable,
+				entropy:         curSig.Entropy,
+				confidenceLevel: curSig.ConfidenceLevel,
+			}
+		case patternKind:
+			return PatternSignature{
+				match:           regexp.MustCompile(curSig.Match),
+				comment:         curSig.Comment,
+				description:     curSig.Description,
+				part:            getPart(curSig),
+				signatureid:     curSig.SignatureID,
+				enable:          curSig.Enable,
+				entropy:         curSig.Entropy,
+				confidenceLevel: curSig.ConfidenceLevel,
+			}
+		case safeFunctionKind:
+			return SafeFunctionSignature{
+				match:           regexp.MustCompile(curSig.Match),
+				comment:         curSig.Comment,
+				description:     curSig.Description,
+				part:            getPart(curSig),
+				signatureid:     curSig.SignatureID,
+				enable:          curSig.Enable,
+				entropy:         curSig.Entropy,
+				confidenceLevel: curSig.ConfidenceLevel,
+			}
+		}
+	}
+	return nil
 }
 
 func getPart(sigDef SignatureDef) string {

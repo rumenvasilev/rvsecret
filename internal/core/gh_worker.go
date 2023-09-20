@@ -10,6 +10,8 @@ import (
 	"github.com/rumenvasilev/rvsecret/internal/util"
 )
 
+const retrievedRepo string = " Retrieved repository %s"
+
 func ghWorker(sess *Session, tid int, wg *sync.WaitGroup, ch chan *github.Organization, log *log.Logger) {
 	ctx := context.Background()
 	for {
@@ -53,14 +55,16 @@ func processRequest(ctx context.Context, org *github.Organization, tid int, sess
 		sess.State.Stats.IncrementRepositoriesTotal()
 
 		// Only a subset of repos
-		if sess.GithubUserRepos != nil && isFilteredRepo(repo.Name, sess.GithubUserRepos) {
-			log.Debug(" Retrieved repository %s", repo.FullName)
-			// Add the repo to the sess to be scanned
-			sess.AddRepository(repo)
+		if sess.GithubUserRepos != nil {
+			if isFilteredRepo(repo.Name, sess.GithubUserRepos) {
+				log.Debug(retrievedRepo, repo.FullName)
+				// Add the repo to the sess to be scanned
+				sess.AddRepository(repo)
+			}
 			continue
 		}
 
-		log.Debug(" Retrieved repository %s", repo.FullName)
+		log.Debug(retrievedRepo, repo.FullName)
 		// If we are not doing any filtering and simply grabbing all available repos we add the repos
 		// to the session to be scanned
 		sess.AddRepository(repo)
