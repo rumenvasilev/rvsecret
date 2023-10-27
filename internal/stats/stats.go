@@ -140,6 +140,13 @@ func (s *Stats) IncrementFilesIgnored() {
 	s.FilesIgnored++
 }
 
+// IncrementFilesIgnoredWith will bump the number of files that have been ignored with a number.
+func (s *Stats) IncrementFilesIgnoredWith(amount int) {
+	s.Lock()
+	defer s.Unlock()
+	s.FilesIgnored += amount
+}
+
 // IncrementFindingsTotal will bump the total number of findings that have been matched. This does
 // exclude any other documented criteria.
 func (s *Stats) IncrementFindingsTotal() {

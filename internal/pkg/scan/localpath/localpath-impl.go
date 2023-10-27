@@ -66,7 +66,7 @@ func doFileScan(filename string, sess *core.Session) {
 	// Increment the number of files scanned
 	sess.State.Stats.IncrementFilesScanned()
 	// Scan the file for know signatures
-	dirtyFile, _, out := signatures.Discover(mf, nil, sess.Config, log)
+	dirtyFile, _, ignored, out := signatures.Discover(mf, nil, sess.Config, sess.Signatures, log)
 	for _, v := range out {
 		fin := &finding.Finding{
 			Action:           `File Scan`,
@@ -87,13 +87,16 @@ func doFileScan(filename string, sess *core.Session) {
 
 		// Add a new finding and increment the total
 		_ = fin.Initialize(sess.Config.Global.ScanType, "")
-		sess.AddFinding(fin)
+		sess.State.AddFinding(fin)
 
 		// print the current finding to stdout
 		fin.RealtimeOutput(sess.Config.Global, log)
 	}
 	if dirtyFile {
 		sess.State.Stats.IncrementFilesDirty()
+	}
+	if ignored > 0 {
+		sess.State.Stats.IncrementFilesIgnoredWith(ignored)
 	}
 }
 

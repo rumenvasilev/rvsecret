@@ -114,3 +114,16 @@ func AppendToSlice(trim bool, input, target []string) []string {
 	}
 	return result
 }
+
+func MergeMaps(source, target map[string]int) {
+	if source == nil || target == nil {
+		return
+	}
+	for k, v := range source {
+		if vv, ok := target[k]; ok {
+			target[k] = vv + v
+		} else {
+			target[k] = v
+		}
+	}
+}

@@ -29,6 +29,7 @@ const (
 	ReferrerPolicy  = "no-referrer"
 	local           = "add/path/here"
 	authorization   = "dW5rbm93bjp3aEB0ZXYzJCNARkRT"
+	public          = "/public"
 )
 
 // Start will configure and start the webserver for graphical output and status messages
@@ -59,7 +60,7 @@ func New(cfg config.Config, state *core.State, log *log.Logger) *Engine {
 
 	router := gin.New()
 	router.Use(logger.SetLogger())
-	router.StaticFS("/public", http.FS(serverRoot))
+	router.StaticFS(public, http.FS(serverRoot))
 	router.Use(secure.New(secure.Config{
 		SSLRedirect:           false,
 		IsDevelopment:         false,
@@ -70,7 +71,7 @@ func New(cfg config.Config, state *core.State, log *log.Logger) *Engine {
 		ReferrerPolicy:        ReferrerPolicy,
 	}))
 	router.GET("/", func(c *gin.Context) {
-		location := url.URL{Path: "/public"}
+		location := url.URL{Path: public}
 		c.Redirect(http.StatusFound, location.RequestURI())
 	})
 	router.GET("/images/*path", rewrite{uri: "/images"}.path(router))
@@ -123,7 +124,7 @@ type rewrite struct {
 
 func (r rewrite) path(e *gin.Engine) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Request.URL.Path = "/public" + r.uri + c.Param("path")
+		c.Request.URL.Path = public + r.uri + c.Param("path")
 		e.HandleContext(c)
 		c.Abort()
 	}

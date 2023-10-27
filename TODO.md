@@ -10,16 +10,16 @@
   - Dynamic Changelog (in releases?)
 - Increase test coverage
 - Implement integration tests
-- Refactor core package - remove multi-level nesting
+- x Refactor core package - remove multi-level nesting
 - Remove dependencies on Hashicorp as much as possible (viper?)
-- Create config package
+- x Create config package
 - Remove global cfg var, explicitly pass it as arg
 - x os.Exit() everywhere, raise error instead
-- replace pkg.Scan with interface for easier testing
+- x replace pkg.Scan with interface for easier testing
 - Implement proper server wait, not select{}
 - Store md5 in session, avoiding duplicate calc
 - New Makefile
-- Overhaul updateRules.go
+- x Overhaul updateRules.go
 - x Start webserver everywhere
 
 ## Features
@@ -32,6 +32,7 @@
 - Create GHA to use the tool
   - eat our own dog food - rvsecret scans rvsecret
 - Build docker image
+- Add statistics for updated/downloaded signatures how many are found and how many are loaded - currently 60 out of 21+42(63)
 
 ## Bugs
 - C++ generates false-positives (cisco/mlspp repository) --> should try with different signatures perhaps (like gitleaks?)

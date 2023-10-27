@@ -1,6 +1,7 @@
 package signatures
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -31,10 +32,6 @@ const (
 	patternKind
 	safeFunctionKind
 )
-
-// WARNING, GLOBAL VAR!
-// Signatures holds a list of all signatures used during the session
-var Signatures []Signature
 
 // SafeFunctionSignatures is a collection of safe function sigs
 var SafeFunctionSignatures []SafeFunctionSignature
@@ -138,7 +135,7 @@ func fetchLineNumber(input *[]string, thisMatch string, idx int) int {
 }
 
 // Load will load all known signatures for the various match types into the session
-func Load(filePath string, mLevel int) ([]Signature, string, error) { // TODO we don't need to bring in session here
+func Load(filePath string, mLevel int) ([]Signature, string, error) {
 	// ensure that we have the proper home directory
 	fp, err := util.SetHomeDir(filePath)
 	if err != nil {
@@ -158,52 +155,31 @@ func Load(filePath string, mLevel int) ([]Signature, string, error) { // TODO we
 
 	// sess.SignatureVersion = signaturesMetaData.Version
 
-	var SimpleSignatures []SimpleSignature
-	var PatternSignatures []PatternSignature
-	for _, curSig := range c.SimpleSignatures {
-		res, ok := processSignatures(curSig, mLevel, simpleKind).(SimpleSignature)
-		if res == (SimpleSignature{}) || !ok {
-			continue
-		}
-		SimpleSignatures = append(SimpleSignatures, res)
+	simple := iter(c.SimpleSignatures, mLevel, simpleKind)
+	pattern := iter(c.PatternSignatures, mLevel, patternKind)
+	// TODO are we loading the safe ones somewhere?
+	// safefunc, sfCnt := iter(c.SafeFunctionSignatures, mLevel, safeFunctionKind)
+	all, cnt := mergeSignatures(simple, pattern)
+	if cnt == 0 {
+		return nil, signaturesVersion, errors.New("no signatures were loaded")
 	}
-
-	for _, curSig := range c.PatternSignatures {
-		res, ok := processSignatures(curSig, mLevel, patternKind).(PatternSignature)
-		if res == (PatternSignature{}) || !ok {
-			continue
-		}
-		PatternSignatures = append(PatternSignatures, res)
-	}
-
-	for _, curSig := range c.SafeFunctionSignatures {
-		res, ok := processSignatures(curSig, mLevel, safeFunctionKind).(SafeFunctionSignature)
-		if res == (SafeFunctionSignature{}) || !ok {
-			continue
-		}
-		SafeFunctionSignatures = append(SafeFunctionSignatures, res)
-	}
-
-	idx := len(PatternSignatures) + len(SimpleSignatures)
-
-	Signatures := make([]Signature, idx)
-	jdx := 0
-	for _, v := range SimpleSignatures {
-		Signatures[jdx] = v
-		jdx++
-	}
-
-	for _, v := range PatternSignatures {
-		Signatures[jdx] = v
-		jdx++
-	}
-
-	// TODO are we loading the safe ones somewhere
-
-	return Signatures, signaturesVersion, nil
+	return all, signaturesVersion, nil
 }
 
-func processSignatures(curSig SignatureDef, mLevel int, kind signatureKind) interface{} {
+func iter(sigDefs []SignatureDef, mLevel int, kind signatureKind) []Signature {
+	res := []Signature{}
+	for _, curSig := range sigDefs {
+		t := buildSignatureType(curSig, mLevel, kind)
+		if t == nil {
+			// skip disabled signatures
+			continue
+		}
+		res = append(res, t)
+	}
+	return res
+}
+
+func buildSignatureType(curSig SignatureDef, mLevel int, kind signatureKind) Signature {
 	if curSig.Enable > 0 && curSig.ConfidenceLevel >= mLevel {
 		switch kind {
 		case simpleKind:
@@ -259,19 +235,40 @@ func getPart(sigDef SignatureDef) string {
 	}
 }
 
+// mergeSignatures would merge two slices of signatures into memory-optimized one
+// the result is a new slice of signatures and total count of them
+func mergeSignatures(simple, pattern []Signature) ([]Signature, int) {
+	total := len(simple) + len(pattern)
+	result := make([]Signature, total)
+
+	jdx := 0
+	for _, v := range simple {
+		result[jdx] = v
+		jdx++
+	}
+
+	for _, v := range pattern {
+		result[jdx] = v
+		jdx++
+	}
+	return result, total
+}
+
 type DiscoverOutput struct {
 	Sig     Signature
 	Content string
 	LineNum int
 }
 
-func Discover(mf matchfile.MatchFile, change *object.Change, cfg *config.Config, log *log.Logger) (dirtyFile bool, dirtyCommit bool, results []DiscoverOutput) {
+func Discover(mf matchfile.MatchFile, change *object.Change, cfg *config.Config, sigs []Signature, log *log.Logger) (dirtyFile bool, dirtyCommit bool, ignored int, results []DiscoverOutput) {
 	var content string
+	var errors = make(map[string]int)
 	// for each signature that is loaded scan the file as a whole and generate a map of
 	// the match and the line number the match was found on
-	for _, sig := range Signatures {
+	for _, sig := range sigs {
 		ok, matchMap := sig.ExtractMatch(mf, change, cfg.Global.ScanType, log)
 		if !ok {
+			util.MergeMaps(matchMap, errors)
 			continue
 		}
 
@@ -294,5 +291,11 @@ func Discover(mf matchfile.MatchFile, change *object.Change, cfg *config.Config,
 			results = append(results, DiscoverOutput{Content: content, Sig: sig, LineNum: v})
 		}
 	}
-	return //dirtyFile, dirtyCommit, results
+	ignored = len(errors)
+	if ignored > 0 {
+		for k, v := range errors {
+			log.Error("[Occurrences: %d]: %s", v, k)
+		}
+	}
+	return //dirtyFile, dirtyCommit, ignored, results
 }

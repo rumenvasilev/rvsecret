@@ -5,16 +5,15 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"regexp"
 
 	"github.com/google/go-github/github"
-	cp "github.com/otiai10/copy"
 	"github.com/rumenvasilev/rvsecret/internal/config"
 	"github.com/rumenvasilev/rvsecret/internal/core"
 	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 	whilp "github.com/whilp/git-urls"
+	"gopkg.in/yaml.v3"
 )
 
 // https://raw.githubusercontent.com/N0MoreSecr3ts/wraith-signatures/develop/signatures/default.yaml
@@ -51,7 +50,7 @@ func Update(cfg *config.Config, log *log.Logger) error {
 			log.Debug(err.Error())
 			return fmt.Errorf("github token is not authorized, please update its permissions or generate a new one")
 		}
-		log.Warn("Couldn't fetch the signatures from Github REST API, falling back to git method")
+		log.Warn("Couldn't fetch the signatures from Github REST API, falling back to git clone method")
 		dir, err = fetchSignaturesWithGit(cfg.Signatures.Version, sess)
 		if err != nil {
 			return fmt.Errorf("couldn't fetch the signatures with git clone either, reason: %w", err)
@@ -89,7 +88,6 @@ func cleanInput(u string) (string, error) {
 
 // updateSignatures will install the new signatures into the specified location, changing the name of the previous set
 func updateSignatures(rRepo string, sess *core.Session, log *log.Logger) bool {
-
 	// create a temp directory to hold the signatures we pull
 	// TODO put this in /tmp via a real library
 	tempSignaturesDir := rRepo + "/signatures"
@@ -112,78 +110,61 @@ func updateSignatures(rRepo string, sess *core.Session, log *log.Logger) bool {
 	// if we want to test the signatures before we install them
 	// TODO need to implement something here
 	if sess.Config.Signatures.Test {
-
-		// if the tests pass then we install the signatures
-		if executeTests(rRepo) {
-
-			// copy the files from the temp directory to the signatures directory
-			if err := cp.Copy(tempSignaturesDir, home); err != nil {
-				log.Error(err.Error())
-				return false
-			}
-
-			// get all the files in the signatures directory
-			files, err := os.ReadDir(home)
-			if err != nil {
-				log.Error(err.Error())
-				return false
-			}
-
-			// set them to the current user and the proper permissions
-			for _, f := range files {
-				if err := os.Chmod(home+"/"+f.Name(), 0644); err != nil {
-					log.Error(err.Error())
-					return false
-				}
-			}
-			err = os.RemoveAll(rRepo)
-			if err != nil {
-				log.Error(err.Error())
-			}
-			return true
-
+		if !executeTests(tempSignaturesDir, log) {
+			log.Error("Signature tests have failed. Files are available for inspection in the temporary directory: %q", tempSignaturesDir)
+			return false
 		}
-		err := os.RemoveAll(rRepo)
-		if err != nil {
-			log.Error(err.Error())
-		}
-		return false
-
 	}
 
 	// copy the files from the temp directory to the signatures directory
-	if err := cp.Copy(tempSignaturesDir, home); err != nil {
-		log.Error(err.Error())
-		return false
-	}
-
-	// get all the files in the signatures directory
-	files, err := os.ReadDir(home)
+	err = util.CopyFiles(tempSignaturesDir, home)
 	if err != nil {
 		log.Error(err.Error())
+		log.Error("The signature files are available for inspection in the temporary directory: %q", tempSignaturesDir)
 		return false
 	}
-
-	// set them to the current user and the proper permissions
-	// TODO ensure these are .yaml somehow
-	for _, f := range files {
-		sFileExt := filepath.Ext(home + "/" + f.Name())
-		if sFileExt == "yml" || sFileExt == "yaml" {
-			if err := os.Chmod(home+"/"+f.Name(), 0644); err != nil {
-				log.Error(err.Error())
-				return false
-			}
-		}
-	}
-	// Cleanup after ourselves and remove any temp garbage
-	_ = os.RemoveAll(rRepo)
+	cleanUp(rRepo, log)
 	return true
 }
 
 // executeTests will run any tests associated with the expressions
-// TODO deal with this
-func executeTests(dir string) bool {
+func executeTests(dir string, log *log.Logger) bool {
+	log.Debug("Running tests on acquired signature files...")
+	sigFiles, err := util.GetSignatureFiles(dir)
+	if err != nil {
+		log.Error("Failed to get signature files from target path %q, error: %q", dir, err.Error())
+		return false
+	}
 
-	// run some tests here and return a true/false depending on the outcome
+	// Run tests:
+	return isYaml(sigFiles, log)
+}
+
+// cleanUp after ourselves and remove any temp garbage
+func cleanUp(path string, log *log.Logger) {
+	if err := os.RemoveAll(path); err != nil {
+		log.Error(err.Error())
+	}
+}
+
+// runYamlTest would try to marshal the input file
+// if it can => true
+// if it cannot => false
+func isYaml(files []string, log *log.Logger) bool {
+	var tmp = make(map[string]interface{})
+	for _, v := range files {
+		// read file
+		f, err := os.ReadFile(v)
+		if err != nil {
+			log.Error("Failed to read file %q, error: %q", f, err.Error())
+			return false
+		}
+		// try unmarshalling
+		err = yaml.Unmarshal(f, tmp)
+		if err != nil {
+			log.Error("YAML unmarshalling test for file %q failed. Error: %q", f, err.Error())
+			return false
+		}
+	}
 	return true
 }

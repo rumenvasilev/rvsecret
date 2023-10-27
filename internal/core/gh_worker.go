@@ -2,9 +2,7 @@ package core
 
 import (
 	"context"
-	"sync"
 
-	"github.com/google/go-github/github"
 	_coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
 	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/internal/util"
@@ -12,24 +10,13 @@ import (
 
 const retrievedRepo string = " Retrieved repository %s"
 
-func ghWorker(sess *Session, tid int, wg *sync.WaitGroup, ch chan *github.Organization, log *log.Logger) {
-	ctx := context.Background()
-	for {
-		org, ok := <-ch
-		if !ok {
-			wg.Done()
-			return
-		}
-
-		processRequest(ctx, org, tid, sess, log)
-	}
-}
-
-func processRequest(ctx context.Context, org *github.Organization, tid int, sess *Session, log *log.Logger) {
+// GetAllRepositoriesForOwner will find all repositories for an owner (user or org)
+// and populate the repositories state list (s.State.Repositories)
+func GetAllRepositoriesForOwner(ctx context.Context, login string, kind string, tid int, sess *Session, log *log.Logger) {
 	// Retrieve all the repos in an org regardless of public/private
 	repos, err := sess.Client.GetRepositoriesFromOwner(ctx, _coreapi.Owner{
-		Login: org.Login,
-		Kind:  util.StringToPointer(_coreapi.TargetTypeOrganization),
+		Login: util.StringToPointer(login),
+		Kind:  util.StringToPointer(kind),
 	})
 	if err != nil {
 		// We might get partial result, which is why we only log the error as warning
@@ -39,12 +26,12 @@ func processRequest(ctx context.Context, org *github.Organization, tid int, sess
 		// 		log.Warn("[THREAD #%d]: %s", tid, ghErrResp.Error())
 		// 	}
 		// }
-		log.Debug("[THREAD #%d]: GetRepositoriesFromOwner: %s", tid, err.Error())
+		log.Debug("[THREAD #%d]: GetAllRepositoriesForOwner: %s", tid, err.Error())
 	}
 
 	// In the case where all the repos are private
 	if len(repos) == 0 {
-		log.Debug("No repositories have been gathered for %s", *org.Login)
+		log.Debug("[THREAD #%d]: No repositories have been gathered for %s", login)
 		return
 	}
 
@@ -59,7 +46,7 @@ func processRequest(ctx context.Context, org *github.Organization, tid int, sess
 			if isFilteredRepo(repo.Name, sess.GithubUserRepos) {
 				log.Debug(retrievedRepo, repo.FullName)
 				// Add the repo to the sess to be scanned
-				sess.AddRepository(repo)
+				sess.State.AddRepository(repo)
 			}
 			continue
 		}
@@ -67,7 +54,8 @@ func processRequest(ctx context.Context, org *github.Organization, tid int, sess
 		log.Debug(retrievedRepo, repo.FullName)
 		// If we are not doing any filtering and simply grabbing all available repos we add the repos
 		// to the session to be scanned
-		sess.AddRepository(repo)
+		log.Debug("Adding repo %s", repo.Name)
+		sess.State.AddRepository(repo)
 	}
 }
 

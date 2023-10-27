@@ -1,5 +1,7 @@
 # rvsecret
 
+<img src="https://raw.githubusercontent.com/MariaLetta/free-gophers-pack/master/illustrations/svg/2.svg" width=200 height=200>
+
 A hard fork of [wraith](https://github.com/N0MoreSecr3ts/wraith) (which itself is a hard fork of [gitrob](https://github.com/michenriksen/gitrob))
 
 ![build status](https://github.com/rumenvasilev/rvsecret/actions/workflows/on-push.yaml/badge.svg)

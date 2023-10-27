@@ -51,7 +51,7 @@ func GatherTargets(sess *Session) {
 		}
 
 		sess.Out.Debug("%s (ID: %d) type: %s", *target.Login, *target.ID, *target.Type)
-		sess.AddTarget(target)
+		sess.State.AddTarget(target)
 		// If forking is false AND the target type is an Organization as set above in GetUserOrganization
 		if sess.Config.Global.ExpandOrgs && *target.Type == _coreapi.TargetTypeOrganization {
 			sess.Out.Debug("Gathering members of %s (ID: %d)...", *target.Login, *target.ID)
@@ -64,7 +64,7 @@ func GatherTargets(sess *Session) {
 			// TODO Do we want to spider this out at some point to enumerate all members of an org?
 			for _, member := range members {
 				sess.Out.Debug("Adding organization member %s (ID: %d) to targets", *member.Login, *member.ID)
-				sess.AddTarget(member)
+				sess.State.AddTarget(member)
 			}
 		}
 	}
@@ -106,7 +106,7 @@ func GatherGitlabRepositories(sess *Session) {
 				}
 				for _, repo := range repos {
 					log.Debug(" Retrieved repository: %s", repo.CloneURL)
-					sess.AddRepository(repo)
+					sess.State.AddRepository(repo)
 				}
 				log.Info(" Retrieved %d %s from %s", len(repos), util.Pluralize(len(repos), "repository", "repositories"), *target.Login)
 			}

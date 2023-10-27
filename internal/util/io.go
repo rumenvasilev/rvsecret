@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/mitchellh/go-homedir"
+	cp "github.com/otiai10/copy"
 )
 
 // TODO THIS FUNC HAS TO RETURN ERROR, OTHERWISE WE DO THE SAME CHECK AGAIN LATER
@@ -169,4 +170,42 @@ func WriteToFile(path string, input []byte) error {
 		return fmt.Errorf("failed writing to configuration file, %w", err)
 	}
 	return nil
+}
+
+// CopyFiles will copy files from src to dest directory and attempt to set correct permissions
+func CopyFiles(src, dest string) error {
+	if err := cp.Copy(src, dest); err != nil {
+		return err
+	}
+
+	sigs, err := GetSignatureFiles(dest)
+	if err != nil {
+		return err
+	}
+
+	// set them to the current user and the proper permissions
+	for _, f := range sigs {
+		if err := os.Chmod(f, 0644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GetSignatureFiles will find all the yaml files in the signatures directory
+func GetSignatureFiles(dir string) ([]string, error) {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var sigs []string
+	var ext string
+	for _, f := range files {
+		ext = filepath.Ext(dir + "/" + f.Name())
+		if ext == "yml" || ext == "yaml" {
+			sigs = append(sigs, fmt.Sprintf("%s/%s", dir, f.Name()))
+		}
+	}
+	return sigs, nil
 }

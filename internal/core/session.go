@@ -38,7 +38,7 @@ type Session struct {
 	GithubUserOrgs   []string
 	GithubUserRepos  []string
 	Organizations    []*github.Organization
-	Signatures       []*signatures.Signature
+	Signatures       []signatures.Signature
 }
 
 type State struct {
@@ -95,7 +95,8 @@ func (s *Session) Initialize(cfg *config.Config, log *log.Logger) error {
 		combinedSig = append(combinedSig, curSig...)
 	}
 	// FIXME: updating global var in another pkg
-	signatures.Signatures = combinedSig
+	// signatures.Signatures = combinedSig
+	s.Signatures = combinedSig
 	return nil
 }
 
@@ -104,43 +105,6 @@ func (s *Session) Initialize(cfg *config.Config, log *log.Logger) error {
 func (s *Session) Finish() {
 	s.State.Stats.FinishedAt = time.Now()
 	s.State.Stats.UpdateStatus(_coreapi.StatusFinished)
-}
-
-// AddTarget will add a new target to a session to be scanned during that session
-func (s *Session) AddTarget(target *_coreapi.Owner) {
-	s.State.Lock()
-	defer s.State.Unlock()
-	for _, t := range s.State.Targets {
-		if *target.ID == *t.ID {
-			return
-		}
-	}
-	s.State.Targets = append(s.State.Targets, target)
-	s.State.Stats.IncrementTargets()
-}
-
-// AddRepository will add a given repository to be scanned to a session. This counts as
-// the total number of repos that have been gathered during a session.
-func (s *Session) AddRepository(repository *_coreapi.Repository) {
-	s.State.Lock()
-	defer s.State.Unlock()
-	for _, r := range s.State.Repositories {
-		if repository.ID == r.ID {
-			return
-		}
-	}
-	s.State.Repositories = append(s.State.Repositories, repository)
-
-}
-
-// AddFinding will add a finding that has been discovered during a session to the list of findings
-// for that session
-func (s *Session) AddFinding(finding *finding.Finding) {
-	s.State.Lock()
-	defer s.State.Unlock()
-	// const MaxStrLen = 100
-	s.State.Findings = append(s.State.Findings, finding)
-	s.State.Stats.IncrementFindingsTotal()
 }
 
 // InitThreads will set the correct number of threads based on the commandline flags
@@ -195,84 +159,60 @@ func printSessionStats(s *stats.Stats, log *log.Logger, appVersion, signatureVer
 }
 
 // SummaryOutput will spit out the results of the hunt along with performance data
-func SummaryOutput(sess *Session) {
-
+func SummaryOutput(sess *Session) error {
+	f := sess.State.GetFindings()
 	// alpha sort the findings to make the results idempotent
-	if len(sess.State.Findings) > 0 {
-		sort.Slice(sess.State.Findings, func(i, j int) bool {
-			return sess.State.Findings[i].SecretID < sess.State.Findings[j].SecretID
+	if len(f) > 0 {
+		sort.Slice(f, func(i, j int) bool {
+			return f[i].SecretID < f[j].SecretID
 		})
 	}
 
-	if sess.Config.Global.JSONOutput {
-		if len(sess.State.Findings) > 0 {
-			b, err := json.MarshalIndent(sess.State.Findings, "", "    ")
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			c := string(b)
-			if c == "null" {
-				fmt.Println("[]")
-			} else {
-				fmt.Println(c)
-			}
-		} else {
-			fmt.Println("[]")
-		}
-	}
-
-	if sess.Config.Global.CSVOutput {
-		w := csv.NewWriter(os.Stdout)
-		defer w.Flush()
-		header := []string{
-			"FilePath",
-			"Line Number",
-			"Action",
-			"Description",
-			"SignatureID",
-			"Finding List",
-			"Repo Owner",
-			"Repo Name",
-			"Commit Hash",
-			"Commit Message",
-			"Commit Author",
-			"File URL",
-			"Secret ID",
-			"App Version",
-			"Signatures Version",
-		}
-		err := w.Write(header)
-		if err != nil {
-			sess.Out.Error(err.Error())
-		}
-
-		for _, v := range sess.State.Findings {
-			line := []string{
-				v.FilePath,
-				v.LineNumber,
-				v.Action,
-				v.Description,
-				v.SignatureID,
-				v.Content,
-				v.RepositoryOwner,
-				v.RepositoryName,
-				v.CommitHash,
-				v.CommitMessage,
-				v.CommitAuthor,
-				v.FileURL,
-				v.SecretID,
-				v.AppVersion,
-				v.SignatureVersion,
-			}
-			err := w.Write(line)
-			if err != nil {
-				sess.Out.Error(err.Error())
-			}
-		}
-	}
-
-	if !sess.Config.Global.JSONOutput && !sess.Config.Global.CSVOutput {
+	switch {
+	case sess.Config.Global.JSONOutput:
+		return writeJSON(f)
+	case sess.Config.Global.CSVOutput:
+		return writeCSV(f)
+	default:
 		printSessionStats(sess.State.Stats, sess.Out, sess.Config.Global.AppVersion, sess.SignatureVersion)
+		return nil
 	}
+}
+
+func writeJSON(findings []*finding.Finding) error {
+	if len(findings) == 0 {
+		fmt.Println("[]")
+	}
+
+	b, err := json.MarshalIndent(findings, "", "    ")
+	if err != nil {
+		return err
+	}
+	c := string(b)
+	if c == "null" {
+		fmt.Println("[]")
+	} else {
+		fmt.Println(c)
+	}
+
+	return nil
+}
+
+func writeCSV(findings []*finding.Finding) error {
+	w := csv.NewWriter(os.Stdout)
+	defer w.Flush()
+
+	err := w.Write(finding.GetFindingsCSVHeader())
+	if err != nil {
+		return err
+	}
+
+	for _, v := range findings {
+		err := w.Write(v.ToCSV())
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

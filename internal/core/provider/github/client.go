@@ -84,29 +84,10 @@ func (c *Client) GetUserOrganization(ctx context.Context, name string) (*_coreap
 	// TODO perhaps we should pass config argument which one are we searching for
 	if err != nil {
 		c.logger.Warn("Couldn't find user under that name: %s. Will search for org instead.", name)
+		c.logger.Debug("Wrapped error: %q", err.Error())
 		return c.getOrg(ctx, name)
 	}
 	return res, nil
-}
-
-func (c *Client) getOrg(ctx context.Context, name string) (*_coreapi.Owner, error) {
-	org, _, err := c.apiClient.Organizations.Get(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	return &_coreapi.Owner{
-		Login:     org.Login,
-		ID:        org.ID,
-		Type:      org.Type,
-		Name:      org.Name,
-		AvatarURL: org.AvatarURL,
-		URL:       org.HTMLURL,
-		Company:   org.Company,
-		Blog:      org.Blog,
-		Location:  org.Location,
-		Email:     org.Email,
-		// Bio:       org.Bio,
-	}, nil
 }
 
 func (c *Client) getUser(ctx context.Context, name string) (*_coreapi.Owner, error) {
@@ -126,18 +107,44 @@ func (c *Client) getUser(ctx context.Context, name string) (*_coreapi.Owner, err
 		Location:  user.Location,
 		Email:     user.Email,
 		Bio:       user.Bio,
+		Kind:      util.StringToPointer(_coreapi.TargetTypeUser),
+	}, nil
+}
+
+func (c *Client) getOrg(ctx context.Context, name string) (*_coreapi.Owner, error) {
+	org, _, err := c.apiClient.Organizations.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return &_coreapi.Owner{
+		Login:     org.Login,
+		ID:        org.ID,
+		Type:      org.Type,
+		Name:      org.Name,
+		AvatarURL: org.AvatarURL,
+		URL:       org.HTMLURL,
+		Company:   org.Company,
+		Blog:      org.Blog,
+		Location:  org.Location,
+		Email:     org.Email,
+		Kind:      util.StringToPointer(_coreapi.TargetTypeOrganization),
+		// Bio:       org.Bio,
 	}, nil
 }
 
 // GetRepositoriesFromOwner is used gather all the repos associated with the org owner or other user.
 // This is only used by the gitlab client. The github client use a github specific function.
 func (c *Client) GetRepositoriesFromOwner(ctx context.Context, target _coreapi.Owner) ([]*_coreapi.Repository, error) {
-	if *target.Kind == _coreapi.TargetTypeOrganization {
+	switch *target.Kind {
+	case _coreapi.TargetTypeOrganization:
 		c.logger.Debug("We're searching all org repositories...")
 		return c.getOrgRepositories(ctx, *target.Login)
+	case _coreapi.TargetTypeUser:
+		c.logger.Debug("We're searching all user repositories...")
+		return c.getUserRepositories(ctx, *target.Login)
+	default:
+		return nil, fmt.Errorf("unsupported target type %q", *target.Kind)
 	}
-	c.logger.Debug("We're searching all user repositories...")
-	return c.getUserRepositories(ctx, *target.Login)
 }
 
 func (c *Client) getOrgRepositories(ctx context.Context, login string) ([]*_coreapi.Repository, error) {

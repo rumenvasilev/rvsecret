@@ -32,11 +32,12 @@ var scanGithubCmd = &cobra.Command{
 
 func init() {
 	ScanCmd.AddCommand(scanGithubCmd)
-	// scanGithubCmd.Flags().Bool("add-org-members", false, "Add members to targets when processing organizations")
 	scanGithubCmd.Flags().StringP("api-token", "t", "", "API token for github access, see documentation for necessary scope")
 	viper.BindPFlag("github.api-token", scanGithubCmd.Flags().Lookup("api-token")) //nolint:errcheck
 	scanGithubCmd.Flags().StringSliceP("orgs", "o", config.DefaultConfig.Github.UserDirtyOrgs, "List of github orgs to scan")
 	viper.BindPFlag("github.orgs", scanGithubCmd.Flags().Lookup("orgs")) //nolint:errcheck
+	scanGithubCmd.Flags().Bool("expand-orgs", false, "Set to true if you want to discover all the users under given organization and enumerate and thus scan all of the combined reporistories.")
+	viper.BindPFlag("global.expand-orgs", scanGithubCmd.Flags().Lookup("expand-orgs")) //nolint:errcheck
 	scanGithubCmd.Flags().StringSliceP("users", "u", config.DefaultConfig.Github.UserDirtyNames, "List of github.com users to scan")
 	scanGithubCmd.MarkFlagsMutuallyExclusive("orgs", "users")
 	viper.BindPFlag("github.users", scanGithubCmd.Flags().Lookup("users")) //nolint:errcheck

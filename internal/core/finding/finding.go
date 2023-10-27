@@ -51,15 +51,8 @@ func (f *Finding) Initialize(scanType api.ScanType, gheURL string) error {
 func (f *Finding) setupUrls(scanType api.ScanType, gheURL string) {
 	var baseURL string
 	switch scanType {
-	// case api.GithubEnterprise:
-	// baseURL = sess.GithubEnterpriseURL
-	// SHOULD THIS BE THIS WAY?
-	// f.RepositoryURL = fmt.Sprintf("%s/%s/%s", baseURL, f.RepositoryOwner, f.RepositoryName)
-	// f.FileURL = fmt.Sprintf("%s/blob/%s/%s", f.RepositoryURL, f.CommitHash, f.FilePath)
-	// f.CommitURL = fmt.Sprintf("%s/commit/%s", f.RepositoryURL, f.CommitHash)
 	case api.Github, api.GithubEnterprise:
 		baseURL = githubURL
-		// TODO: IS THIS CORRECT??
 		if scanType == api.GithubEnterprise {
 			baseURL = gheURL
 		}
@@ -95,5 +88,45 @@ func (f *Finding) RealtimeOutput(cfg config.Global, log *log.Logger) {
 
 		log.Info(" ------------------------------------------------")
 		log.Info("")
+	}
+}
+
+func GetFindingsCSVHeader() []string {
+	return []string{
+		"FilePath",
+		"Line Number",
+		"Action",
+		"Description",
+		"SignatureID",
+		"Finding List",
+		"Repo Owner",
+		"Repo Name",
+		"Commit Hash",
+		"Commit Message",
+		"Commit Author",
+		"File URL",
+		"Secret ID",
+		"App Version",
+		"Signatures Version",
+	}
+}
+
+func (f *Finding) ToCSV() []string {
+	return []string{
+		f.FilePath,
+		f.LineNumber,
+		f.Action,
+		f.Description,
+		f.SignatureID,
+		f.Content,
+		f.RepositoryOwner,
+		f.RepositoryName,
+		f.CommitHash,
+		f.CommitMessage,
+		f.CommitAuthor,
+		f.FileURL,
+		f.SecretID,
+		f.AppVersion,
+		f.SignatureVersion,
 	}
 }

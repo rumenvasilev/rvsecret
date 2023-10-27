@@ -34,7 +34,7 @@ func (g Gitlab) Do() error {
 
 	// By default we display a header to the user giving basic info about application. This will not be displayed
 	// during a silent run which is the default when using this in an automated fashion.
-	banner.HeaderInfo(cfg.Global, sess.State.Stats.StartedAt.Format(time.RFC3339), log)
+	banner.HeaderInfo(cfg.Global, sess.State.Stats.StartedAt.Format(time.RFC3339), len(sess.Signatures), log)
 
 	sess.Client, err = provider.InitGitClient(sess.Config, log)
 	if err != nil {
@@ -46,7 +46,9 @@ func (g Gitlab) Do() error {
 	core.AnalyzeRepositories(sess, sess.State.Stats, log)
 	sess.Finish()
 
-	core.SummaryOutput(sess)
+	if err := core.SummaryOutput(sess); err != nil {
+		return err
+	}
 
 	if cfg.Global.WebServer && !cfg.Global.Silent {
 		log.Important("%s", banner.ASCIIBanner)

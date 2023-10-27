@@ -3,7 +3,7 @@ package config
 var signatures = Signatures{
 	URL:     "https://github.com/rumenvasilev/rvsecret-signatures",
 	Version: "latest",
-	Test:    false,
+	Test:    true,
 	File:    "$HOME/.rvsecret/signatures/default.yaml",
 	Path:    "$HOME/.rvsecret/signatures",
 }

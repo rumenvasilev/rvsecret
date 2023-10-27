@@ -44,7 +44,6 @@ func (s PatternSignature) ExtractMatch(file matchfile.MatchFile, change *object.
 }
 
 func (s PatternSignature) partContent(haystack string, change *object.Change, scanType api.ScanType, log *log.Logger) (bool, map[string]int) {
-	var bResult bool
 	var contextMatches []string
 	results := make(map[string]int) // the secret and the line number in a map
 
@@ -52,45 +51,29 @@ func (s PatternSignature) partContent(haystack string, change *object.Change, sc
 		return false, nil
 	}
 
-	if _, err := os.Stat(haystack); err == nil {
-		data, err := os.ReadFile(haystack)
-		if err != nil {
-			sErrAppend := fmt.Sprintf("ERROR --- Unable to open file for scanning: <%s> \nError Message: <%s>", haystack, err)
-			results[sErrAppend] = 0 // set to zero due to error, we never have a line 0 so we can always ignore that or error on it
-			return false, results
+	data, err := os.ReadFile(haystack)
+	if err != nil {
+		sErrAppend := fmt.Sprintf("ERROR --- Unable to open file for scanning: %q; Reason: %q", haystack, err)
+		results[sErrAppend] = 1 // set to zero due to error, we never have a line 0 so we can always ignore that or error on it
+		return false, results
+	}
+
+	// Check to see if there is a match in the data and if so switch to a Findall that
+	// will get a slice of all the individual matches. Doing this ahead of time saves us
+	// from looping through if it is not necessary.
+	if s.match.Match(data) {
+		for _, curRegexMatch := range s.match.FindAll(data, -1) {
+			contextMatches = append(contextMatches, string(curRegexMatch))
 		}
-
-		// Check to see if there is a match in the data and if so switch to a Findall that
-		// will get a slice of all the individual matches. Doing this ahead of time saves us
-		// from looping through if it is not necessary.
-		if s.match.Match(data) {
-			for _, curRegexMatch := range s.match.FindAll(data, -1) {
-				contextMatches = append(contextMatches, string(curRegexMatch))
-			}
-			if len(contextMatches) > 0 {
-				bResult = true
-				for i, curMatch := range contextMatches {
-
-					thisMatch := string(curMatch[:])
-					thisMatch = strings.TrimSuffix(thisMatch, "\n")
-
-					bResult = confirmEntropy(thisMatch, s.entropy)
-
-					if bResult {
-						linesOfScannedFile := strings.Split(string(data), "\n")
-
-						num := fetchLineNumber(&linesOfScannedFile, thisMatch, 0)
-						results[strconv.Itoa(i)+"_"+thisMatch] = num
-					}
-				}
-				return bResult, results
-			}
+		if len(contextMatches) > 0 {
+			return examineMatchResults(contextMatches, false, s.entropy, string(data))
 		}
 	}
 
 	if scanType == api.LocalPath {
 		return false, results
 	}
+
 	content, err := _git.GetChangeContent(change)
 	if err != nil {
 		log.Error("Error retrieving content in commit %s, change %s: %s", "commit.String()", change.String(), err)
@@ -101,25 +84,34 @@ func (s PatternSignature) partContent(haystack string, change *object.Change, sc
 			contextMatches = append(contextMatches, string(curRegexMatch))
 		}
 		if len(contextMatches) > 0 {
-			bResult = true
-			for i, curMatch := range contextMatches {
-				thisMatch := string(curMatch[:])
-				thisMatch = strings.TrimSuffix(thisMatch, "\n")
-
-				bResult = confirmEntropy(thisMatch, s.entropy)
-
-				if bResult {
-					linesOfScannedFile := strings.Split(content, "\n")
-
-					num := fetchLineNumber(&linesOfScannedFile, thisMatch, i)
-					results[strconv.Itoa(i)+"_"+thisMatch] = num
-				}
-			}
-			return bResult, results
+			return examineMatchResults(contextMatches, true, s.entropy, content)
 		}
 	}
 
 	return false, nil
+}
+
+func examineMatchResults(contextMatches []string, dynamicMatch bool, entropy float64, content string) (bool, map[string]int) {
+	bResult := true
+	var results = make(map[string]int)
+	var mn int
+	for i, curMatch := range contextMatches {
+		thisMatch := string(curMatch[:])
+		thisMatch = strings.TrimSuffix(thisMatch, "\n")
+
+		bResult = confirmEntropy(thisMatch, entropy)
+
+		if bResult {
+			mn = 0
+			if dynamicMatch {
+				mn = i
+			}
+			linesOfScannedFile := strings.Split(content, "\n")
+			num := fetchLineNumber(&linesOfScannedFile, thisMatch, mn)
+			results[strconv.Itoa(i)+"_"+thisMatch] = num
+		}
+	}
+	return bResult, results
 }
 
 // Enable sets whether as signature is active or not

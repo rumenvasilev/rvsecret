@@ -190,7 +190,7 @@ func (sess *Session) isDirtyCommit(commit *object.Commit, repo _coreapi.Reposito
 		// dirtyFile := false
 
 		// call signaturesfunc
-		dirtyFile, dcommit, out := signatures.Discover(mf, change, sess.Config, log)
+		dirtyFile, dcommit, ignored, out := signatures.Discover(mf, change, sess.Config, sess.Signatures, log)
 		for _, v := range out {
 			fin := &finding.Finding{
 				Action:           changeAction,
@@ -210,7 +210,7 @@ func (sess *Session) isDirtyCommit(commit *object.Commit, repo _coreapi.Reposito
 			}
 			_ = fin.Initialize(sess.Config.Global.ScanType, sess.Config.Github.GithubEnterpriseURL)
 			// Add it to the session
-			sess.AddFinding(fin)
+			sess.State.AddFinding(fin)
 			log.Debug("[THREAD #%d][%s] Done analyzing changes in %s", tid, repo.CloneURL, commit.Hash)
 
 			// // Print realtime data to stdout
@@ -222,6 +222,9 @@ func (sess *Session) isDirtyCommit(commit *object.Commit, repo _coreapi.Reposito
 		}
 		if dcommit {
 			dirtyCommit = dcommit
+		}
+		if ignored > 0 {
+			stats.IncrementFilesIgnoredWith(ignored)
 		}
 	}
 	return dirtyCommit

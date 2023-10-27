@@ -18,9 +18,7 @@ func New(cfg *config.Config, log *log.Logger) api.Scanner {
 		return localpath.Localpath{Cfg: cfg, Log: log}
 	case api.LocalGit:
 		return localgit.LocalGit{Cfg: cfg, Log: log}
-	case api.GithubEnterprise:
-		return github.GHE{Cfg: cfg, Log: log}
-	case api.Github:
+	case api.GithubEnterprise, api.Github:
 		return github.Github{Cfg: cfg, Log: log}
 	case api.Gitlab:
 		return gitlab.Gitlab{Cfg: cfg, Log: log}
