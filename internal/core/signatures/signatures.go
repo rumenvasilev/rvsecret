@@ -33,6 +33,16 @@ const (
 	safeFunctionKind
 )
 
+type GenericSignature struct {
+	comment         string
+	description     string
+	part            string
+	signatureid     string
+	enable          int
+	entropy         float64
+	confidenceLevel int
+}
+
 // SafeFunctionSignatures is a collection of safe function sigs
 var SafeFunctionSignatures []SafeFunctionSignature
 
@@ -181,39 +191,30 @@ func iter(sigDefs []SignatureDef, mLevel int, kind signatureKind) []Signature {
 
 func buildSignatureType(curSig SignatureDef, mLevel int, kind signatureKind) Signature {
 	if curSig.Enable > 0 && curSig.ConfidenceLevel >= mLevel {
+		g := GenericSignature{
+			comment:         curSig.Comment,
+			description:     curSig.Description,
+			part:            getPart(curSig),
+			signatureid:     curSig.SignatureID,
+			enable:          curSig.Enable,
+			entropy:         curSig.Entropy,
+			confidenceLevel: curSig.ConfidenceLevel,
+		}
 		switch kind {
 		case simpleKind:
 			return SimpleSignature{
-				match:           curSig.Match,
-				comment:         curSig.Comment,
-				description:     curSig.Description,
-				part:            getPart(curSig),
-				signatureid:     curSig.SignatureID,
-				enable:          curSig.Enable,
-				entropy:         curSig.Entropy,
-				confidenceLevel: curSig.ConfidenceLevel,
+				match:            curSig.Match,
+				GenericSignature: g,
 			}
 		case patternKind:
 			return PatternSignature{
-				match:           regexp.MustCompile(curSig.Match),
-				comment:         curSig.Comment,
-				description:     curSig.Description,
-				part:            getPart(curSig),
-				signatureid:     curSig.SignatureID,
-				enable:          curSig.Enable,
-				entropy:         curSig.Entropy,
-				confidenceLevel: curSig.ConfidenceLevel,
+				match:            regexp.MustCompile(curSig.Match),
+				GenericSignature: g,
 			}
 		case safeFunctionKind:
 			return SafeFunctionSignature{
-				match:           regexp.MustCompile(curSig.Match),
-				comment:         curSig.Comment,
-				description:     curSig.Description,
-				part:            getPart(curSig),
-				signatureid:     curSig.SignatureID,
-				enable:          curSig.Enable,
-				entropy:         curSig.Entropy,
-				confidenceLevel: curSig.ConfidenceLevel,
+				match:            regexp.MustCompile(curSig.Match),
+				GenericSignature: g,
 			}
 		}
 	}

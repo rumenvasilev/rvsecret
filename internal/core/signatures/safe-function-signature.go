@@ -11,14 +11,8 @@ import (
 
 // SafeFunctionSignature holds the information about a safe function, that is used to detect and mitigate false positives
 type SafeFunctionSignature struct {
-	match           *regexp.Regexp
-	comment         string
-	description     string
-	part            string
-	signatureid     string
-	enable          int
-	entropy         float64
-	confidenceLevel int
+	match *regexp.Regexp
+	GenericSignature
 }
 
 // ExtractMatch is a placeholder to ensure min code complexity and allow the reuse of the functions

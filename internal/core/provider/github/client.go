@@ -24,7 +24,7 @@ type Client struct {
 func NewClient(token, gheURL string, logger *log.Logger) (*Client, error) {
 	err := validateAPIToken(token)
 	if err != nil {
-		return nil, fmt.Errorf("APIToken is invalid, %q", token)
+		return nil, fmt.Errorf("cannot create new Github client, %w", err)
 	}
 	// Get OAuth client
 	oauth := getOauthClient(token)
@@ -80,10 +80,10 @@ func validateAPIToken(token string) error {
 // GetUserOrganization is used to enumerate the owner in a given org
 func (c *Client) GetUserOrganization(ctx context.Context, name string) (*_coreapi.Owner, error) {
 	res, err := c.getUser(ctx, name)
-	// Couldn't find organization by that name, try user instead
+	// Couldn't find user by that name, try organization instead
 	// TODO perhaps we should pass config argument which one are we searching for
 	if err != nil {
-		c.logger.Warn("Couldn't find user under that name: %s. Will search for org instead.", name)
+		c.logger.Warn("Couldn't find user under that name %q. Will search for org instead.", name)
 		c.logger.Debug("Wrapped error: %q", err.Error())
 		return c.getOrg(ctx, name)
 	}

@@ -17,14 +17,8 @@ import (
 
 // PatternSignature holds the information about a pattern signature which is a regex used to match content within a file
 type PatternSignature struct {
-	match           *regexp.Regexp
-	comment         string
-	description     string
-	part            string
-	signatureid     string
-	enable          int
-	entropy         float64
-	confidenceLevel int
+	match *regexp.Regexp
+	GenericSignature
 }
 
 // ExtractMatch will try and find a match within the content of the file.

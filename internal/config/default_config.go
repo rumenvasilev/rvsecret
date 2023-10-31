@@ -21,8 +21,8 @@ var gitlab = Gitlab{
 }
 
 var global = Global{
-	BindAddress:     "127.0.0.1",
-	ConfigFile:      "$HOME/.rvsecret/config.yaml",
+	BindAddress: "127.0.0.1",
+	// ConfigFile:      "none", // default defined as const in config.go
 	BindPort:        9393,
 	CommitDepth:     -1,
 	ConfidenceLevel: 3,

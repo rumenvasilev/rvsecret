@@ -59,7 +59,7 @@ func (f *Finding) setupUrls(scanType api.ScanType, gheURL string) {
 		f.RepositoryURL = fmt.Sprintf("%s/%s/%s", baseURL, f.RepositoryOwner, f.RepositoryName)
 		f.FileURL = fmt.Sprintf("%s/blob/%s/%s", f.RepositoryURL, f.CommitHash, f.FilePath)
 		f.CommitURL = fmt.Sprintf("%s/commit/%s", f.RepositoryURL, f.CommitHash)
-	case "gitlab":
+	case api.Gitlab:
 		baseURL = gitlabURL
 		results := util.CleanURLSpaces(f.RepositoryOwner, f.RepositoryName)
 		f.RepositoryURL = fmt.Sprintf("%s/%s/%s", baseURL, results[0], results[1])

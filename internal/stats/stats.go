@@ -56,6 +56,8 @@ func Init() *Stats {
 }
 
 func (s *Stats) UpdateStatus(to _coreapi.Status) {
+	s.Lock()
+	defer s.Unlock()
 	s.Status = to
 }
 

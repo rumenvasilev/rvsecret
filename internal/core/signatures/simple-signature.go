@@ -9,14 +9,8 @@ import (
 
 // SimpleSignature holds the information about a simple signature which is used to match a path or filename
 type SimpleSignature struct {
-	comment         string
-	description     string
-	match           string
-	part            string
-	signatureid     string
-	enable          int
-	entropy         float64
-	confidenceLevel int
+	match string
+	GenericSignature
 }
 
 // ExtractMatch will attempt to match a path or file name of the given file

@@ -92,6 +92,10 @@ func PointerToInt64(p *int64) int64 {
 	return *p
 }
 
+func Int64ToPointer(i int64) *int64 {
+	return &i
+}
+
 // AppendIfMissing will check a slice for a value before appending it
 func AppendIfMissing(slice []string, s string) []string {
 	for _, ele := range slice {

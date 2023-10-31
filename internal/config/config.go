@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/fatih/structs"
 	"github.com/mitchellh/go-homedir"
@@ -12,6 +13,7 @@ import (
 	"github.com/rumenvasilev/rvsecret/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v2"
 )
 
 const configFile = "$HOME/.rvsecret/config.yaml"
@@ -37,31 +39,31 @@ type Config struct {
 
 type Global struct {
 	AppVersion      string       `yaml:"-"`
-	BindAddress     string       `mapstructure:"bind-address" yaml:"bind-address"`
-	ConfigFile      string       `mapstructure:"config-file" yaml:"-"`
-	ScanType        api.ScanType `mapstructure:"scan-type" yaml:"-"`
-	SkippableExt    []string     `mapstructure:"ignore-extension" yaml:"ignore-extension"`
-	SkippablePath   []string     `mapstructure:"ignore-path" yaml:"ignore-path"`
-	BindPort        int          `mapstructure:"bind-port" yaml:"bind-port"`
-	CommitDepth     int          `mapstructure:"commit-depth" yaml:"commit-depth"`
-	ConfidenceLevel int          `mapstructure:"confidence-level" yaml:"confidence-level"`
-	MaxFileSize     int64        `mapstructure:"max-file-size" yaml:"max-file-size"`
-	Threads         int          `mapstructure:"num-threads" yaml:"num-threads"`
+	BindAddress     string       `mapstructure:"bind-address" structs:"bind-address" yaml:"bind-address"`
+	ConfigFile      string       `mapstructure:"config-file" structs:"config-file" yaml:"-"`
+	ScanType        api.ScanType `mapstructure:"scan-type" structs:"scan-type" yaml:"-"`
+	SkippableExt    []string     `mapstructure:"ignore-extension" structs:"ignore-extension" yaml:"ignore-extension"`
+	SkippablePath   []string     `mapstructure:"ignore-path" structs:"ignore-path" yaml:"ignore-path"`
+	BindPort        int          `mapstructure:"bind-port" structs:"bind-port" yaml:"bind-port"`
+	CommitDepth     int          `mapstructure:"commit-depth" structs:"commit-depth" yaml:"commit-depth"`
+	ConfidenceLevel int          `mapstructure:"confidence-level" structs:"confidence-level" yaml:"confidence-level"`
+	MaxFileSize     int64        `mapstructure:"max-file-size" structs:"max-file-size" yaml:"max-file-size"`
+	Threads         int          `mapstructure:"num-threads" structs:"num-threads" yaml:"num-threads"`
 	CSVOutput       bool         `mapstructure:"csv"`
 	Debug           bool         `mapstructure:"debug"`
-	ExpandOrgs      bool         `mapstructure:"expand-orgs" yaml:"expand-orgs"`
-	HideSecrets     bool         `mapstructure:"hide-secrets" yaml:"hide-secrets"`
-	InMemClone      bool         `mapstructure:"in-mem-clone" yaml:"in-mem-clone"`
-	JSONOutput      bool         `mapstructure:"json"`
-	ScanFork        bool         `mapstructure:"scan-forks" yaml:"scan-forks"`
-	ScanTests       bool         `mapstructure:"scan-tests" yaml:"scan-tests"`
+	ExpandOrgs      bool         `mapstructure:"expand-orgs" structs:"expand-orgs" yaml:"expand-orgs"`
+	HideSecrets     bool         `mapstructure:"hide-secrets" structs:"hide-secrets" yaml:"hide-secrets"`
+	InMemClone      bool         `mapstructure:"in-mem-clone" structs:"in-mem-clone" yaml:"in-mem-clone"`
+	JSONOutput      bool         `mapstructure:"json" structs:"json"`
+	ScanFork        bool         `mapstructure:"scan-forks" structs:"scan-forks" yaml:"scan-forks"`
+	ScanTests       bool         `mapstructure:"scan-tests" structs:"scan-tests" yaml:"scan-tests"`
 	Silent          bool         `mapstructure:"silent"`
-	WebServer       bool         `mapstructure:"web-server" yaml:"web-server"`
+	WebServer       bool         `mapstructure:"web-server" structs:"web-server" yaml:"web-server"`
 	_               [6]byte
 }
 
 type Signatures struct {
-	APIToken string `mapstructure:"api-token" yaml:"api-token"`
+	APIToken string `mapstructure:"api-token" structs:"api-token" yaml:"api-token"`
 	File     string `mapstructure:"file"`
 	Path     string `mapstructure:"path"`
 	URL      string `mapstructure:"url"`
@@ -72,39 +74,78 @@ type Signatures struct {
 }
 
 type Github struct {
-	APIToken            string   `mapstructure:"api-token" yaml:"api-token"`
-	GithubURL           string   `mapstructure:"url" yaml:"url"`
-	GithubEnterpriseURL string   `mapstructure:"enterprise-url" yaml:"enterprise-url"`
-	UserDirtyNames      []string `mapstructure:"users" yaml:"users"`
-	UserDirtyOrgs       []string `mapstructure:"orgs" yaml:"orgs"`
-	UserDirtyRepos      []string `mapstructure:"repos" yaml:"repos"`
+	APIToken            string   `mapstructure:"api-token" structs:"api-token" yaml:"api-token"`
+	GithubURL           string   `mapstructure:"url" structs:"url" yaml:"url"`
+	GithubEnterpriseURL string   `mapstructure:"enterprise-url" structs:"enterprise-url" yaml:"enterprise-url"`
+	UserDirtyNames      []string `mapstructure:"users" structs:"users" yaml:"users,omitempty"`
+	UserDirtyOrgs       []string `mapstructure:"orgs" structs:"orgs" yaml:"orgs,omitempty"`
+	UserDirtyRepos      []string `mapstructure:"repos" structs:"repos" yaml:"repos,omitempty"`
 	Enterprise          bool     `mapstructure:"enterprise"`
 	_                   [7]byte
 }
 
 type Gitlab struct {
-	APIToken string   `mapstructure:"api-token" yaml:"api-token"`
-	Targets  []string `mapstructure:"projects" yaml:"projects"`
+	APIToken string   `mapstructure:"api-token" structs:"api-token" yaml:"api-token"`
+	Targets  []string `mapstructure:"projects" structs:"projects" yaml:"projects,omitempty"`
 	_        [24]byte
 }
 
 type Local struct {
-	Paths []string `mapstructure:"paths"`
-	Repos []string `mapstructure:"repos"`
+	Paths []string `mapstructure:"paths" yaml:",omitempty"`
+	Repos []string `mapstructure:"repos" yaml:",omitempty"`
 	_     [16]byte
+}
+
+func (c Config) toYaml() string {
+	res, err := yaml.Marshal(c)
+	if err != nil {
+		panic(err)
+	}
+	return string(res)
+}
+
+func isEmpty(input interface{}) bool {
+	// check all iterables, the rest have defaults
+	if v, ok := input.([]string); ok {
+		return len(v) == 0
+	} else if v, ok := input.(string); ok {
+		return len(v) == 0
+		// } else if _, ok := input.(int); ok {
+		// 	return false
+		// } else if _, ok := input.(int64); ok {
+		// 	return false
+		// } else if _, ok := input.(bool); ok {
+		// 	return false
+	} else if v, ok := input.(api.ScanType); ok {
+		return len(v) == 0
+	} else {
+		return false
+	}
 }
 
 // SetConfig will set the defaults, and load a config file and environment variables if they are present
 func SetConfig(cmd *cobra.Command) {
 	// Set defaults
 	for key, value := range structs.Map(DefaultConfig) {
-		viper.SetDefault(key, value)
+		for kk, vv := range value.(map[string]interface{}) {
+			// populate only fields that aren't empty
+			if !isEmpty(vv) {
+				// kkkey := strings.ToLower(fmt.Sprintf("%s.%s", key, kk))
+				// fmt.Printf("%s => %v\n", kkkey, vv)
+				viper.SetDefault(strings.ToLower(fmt.Sprintf("%s.%s", key, kk)), vv)
+			}
+		}
 	}
 
 	// Read from config
-	cf := viper.GetString("config-file")
+	cf := viper.GetString("global.config-file")
+	noconfig := false
 	if cf != "" && cf != configFile {
-		viper.SetConfigFile(cf)
+		if util.FileExists(cf) {
+			viper.SetConfigFile(cf)
+		} else {
+			noconfig = true
+		}
 	} else {
 		home, err := homedir.Dir()
 		if err != nil {
@@ -118,15 +159,17 @@ func SetConfig(cmd *cobra.Command) {
 	}
 
 	// Load config into mapstructure
-	err := viper.ReadInConfig() //nolint:errcheck
-	if err != nil {
-		fmt.Printf("Couldn't load config file; proceeding with defaults and CLI overrides, %v\n", err)
+	if !noconfig {
+		err := viper.ReadInConfig() //nolint:errcheck
+		if err != nil {
+			fmt.Printf("Couldn't load config file; proceeding with defaults and CLI overrides, %v\n", err)
+		}
 	}
 	viper.AutomaticEnv()
 
 	// Load mapstructure config into our config struct
 	var c *Config
-	err = viper.Unmarshal(&c)
+	err := viper.Unmarshal(&c)
 	if err != nil {
 		fmt.Println("Failed unmarshaling config to struct")
 		os.Exit(1)
@@ -148,6 +191,7 @@ func SetConfig(cmd *cobra.Command) {
 }
 
 // TODO detect scanType automatically
+// Load depends on cfg being initialized and populated, otherwise it will panic
 func Load(scanType api.ScanType) (*Config, error) {
 	// set configuration
 	cfg.Global.ScanType = scanType
@@ -159,7 +203,7 @@ func Load(scanType api.ScanType) (*Config, error) {
 		}
 	case api.GithubEnterprise:
 		if cfg.Github.GithubEnterpriseURL == "" {
-			return nil, errors.New("Github enterprise URL is not set.")
+			return nil, errors.New("Github enterprise URL is not set")
 		}
 	case api.UpdateSignatures:
 		if cfg.Signatures.APIToken == "" {
@@ -177,7 +221,7 @@ func Load(scanType api.ScanType) (*Config, error) {
 // but for the moment it works fine.
 // TODO dynamically acquire the commit depth of a given repo
 func setCommitDepth(c int) int {
-	if c == -1 {
+	if c < 0 {
 		return 9999999999
 	}
 	return c
