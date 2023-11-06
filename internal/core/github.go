@@ -85,10 +85,3 @@ func GatherOrgsMembers(sess *session.Session) {
 		sess.State.AddTargets(members)
 	}
 }
-
-// GetAllRepositoriesForTargets will iterate all targets and assemble a repository list with sess.AddRepository()
-func GetAllRepositoriesForTargets(ctx context.Context, sess *session.Session) {
-	for _, t := range sess.State.Targets {
-		GetAllRepositoriesForOwner(ctx, *t.Login, *t.Kind, 0, sess)
-	}
-}

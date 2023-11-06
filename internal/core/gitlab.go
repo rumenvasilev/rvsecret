@@ -2,13 +2,11 @@ package core
 
 import (
 	"context"
-	"sync"
 
 	_coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
 	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/internal/session"
 	"github.com/rumenvasilev/rvsecret/internal/stats"
-	"github.com/rumenvasilev/rvsecret/internal/util"
 )
 
 // GatherTargets will enumerate git targets adding them to a running target list. This will set the targets based
@@ -72,54 +70,4 @@ func GatherTargets(sess *session.Session) {
 			}
 		}
 	}
-}
-
-// GatherGitlabRepositories will gather all repositories associated with a given target during a scan session.
-// This is done using threads, whose count is set via commandline flag. Care much be taken to avoid rate
-// limiting associated with suspected DOS attacks.
-func GatherGitlabRepositories(sess *session.Session) {
-	log := log.Log
-	ctx := context.Background()
-	var ch = make(chan *_coreapi.Owner, len(sess.State.Targets))
-	log.Debug("Number of targets: %d", len(sess.State.Targets))
-	var wg sync.WaitGroup
-	var threadNum int
-	if len(sess.State.Targets) == 1 {
-		threadNum = 1
-	} else if len(sess.State.Targets) <= sess.Config.Global.Threads {
-		threadNum = len(sess.State.Targets) - 1
-	} else {
-		threadNum = sess.Config.Global.Threads
-	}
-	wg.Add(threadNum)
-	log.Debug("Threads for repository gathering: %d", threadNum)
-	for i := 0; i < threadNum; i++ {
-		go func() {
-			for {
-				target, ok := <-ch
-				if !ok {
-					wg.Done()
-					return
-				}
-				repos, err := sess.Client.GetRepositoriesFromOwner(ctx, *target)
-				if err != nil {
-					log.Error(" Failed to retrieve repositories from %s: %s", *target.Login, err)
-				}
-				if len(repos) == 0 {
-					continue
-				}
-				for _, repo := range repos {
-					log.Debug(" Retrieved repository: %s", repo.CloneURL)
-					sess.State.AddRepository(repo)
-				}
-				log.Info(" Retrieved %d %s from %s", len(repos), util.Pluralize(len(repos), "repository", "repositories"), *target.Login)
-			}
-		}()
-	}
-
-	for _, target := range sess.State.Targets {
-		ch <- target
-	}
-	close(ch)
-	wg.Wait()
 }

@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"context"
 	"time"
 
 	"github.com/rumenvasilev/rvsecret/internal/config"
@@ -21,6 +22,7 @@ type Gitlab struct {
 func (g Gitlab) Run() error {
 	cfg := g.Cfg
 	log := log.Log
+	ctx := context.Background()
 	// create session
 	sess, err := session.NewWithConfig(cfg)
 	if err != nil {
@@ -43,7 +45,7 @@ func (g Gitlab) Run() error {
 	}
 
 	core.GatherTargets(sess)
-	core.GatherGitlabRepositories(sess)
+	core.GatherRepositories(ctx, sess)
 	core.AnalyzeRepositories(sess, sess.State.Stats)
 	sess.Finish()
 

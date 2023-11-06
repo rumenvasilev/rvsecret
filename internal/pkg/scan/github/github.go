@@ -25,6 +25,7 @@ type Github struct {
 func (g Github) Run() error {
 	cfg := g.Cfg
 	log := log.Log
+	ctx := context.Background()
 	// create session
 	sess, err := session.NewWithConfig(cfg)
 	if err != nil {
@@ -84,7 +85,7 @@ func (g Github) Run() error {
 		return err
 	}
 
-	core.GetAllRepositoriesForTargets(context.TODO(), sess)
+	core.GatherRepositories(ctx, sess)
 	core.AnalyzeRepositories(sess, sess.State.Stats)
 	sess.Finish()
 
