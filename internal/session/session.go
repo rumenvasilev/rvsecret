@@ -2,6 +2,7 @@ package session
 
 import (
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -48,7 +49,7 @@ func initialize(cfg *config.Config) (*Session, error) {
 	s := new(Session).withConfig(cfg)
 
 	// init state
-	s.State = new(State) //&State{Mutex: &sync.Mutex{}}
+	s.State = &State{Mutex: &sync.Mutex{}}
 
 	// init threads
 	s.initThreads()
