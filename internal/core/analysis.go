@@ -7,15 +7,16 @@ import (
 	"strings"
 	"sync"
 
-	_coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
+	coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
 	"github.com/rumenvasilev/rvsecret/internal/core/finding"
-	_git "github.com/rumenvasilev/rvsecret/internal/core/git"
+	"github.com/rumenvasilev/rvsecret/internal/core/git"
+	"github.com/rumenvasilev/rvsecret/internal/core/matchfile"
 	"github.com/rumenvasilev/rvsecret/internal/core/signatures"
 	"github.com/rumenvasilev/rvsecret/internal/log"
-	"github.com/rumenvasilev/rvsecret/internal/matchfile"
+	"github.com/rumenvasilev/rvsecret/internal/session"
 	"github.com/rumenvasilev/rvsecret/internal/stats"
 	"github.com/rumenvasilev/rvsecret/internal/util"
-	"gopkg.in/src-d/go-git.v4"
+	_git "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 )
 
@@ -25,14 +26,15 @@ import (
 //	are controlled by flags. If a directory, file, or the content pass through all of the filters then
 //	it is scanned once per each signature which may lead to a specific secret matching multiple rules
 //	and then generating multiple findings.
-func AnalyzeRepositories(sess *Session, stats *stats.Stats, log *log.Logger) {
-	stats.UpdateStatus(_coreapi.StatusAnalyzing)
+func AnalyzeRepositories(sess *session.Session, st *stats.Stats) {
+	log := log.Log
+	st.UpdateStatus(stats.StatusAnalyzing)
 	repoCnt := len(sess.State.Repositories)
 	if repoCnt == 0 {
 		log.Error("No repositories have been gathered.")
 	}
 
-	var ch = make(chan _coreapi.Repository, repoCnt)
+	var ch = make(chan coreapi.Repository, repoCnt)
 	var wg sync.WaitGroup
 
 	// Calculate the number of threads based on the flag and the number of repos. If the number of repos
@@ -52,7 +54,7 @@ func AnalyzeRepositories(sess *Session, stats *stats.Stats, log *log.Logger) {
 
 	// Start analyzer workers
 	for i := 0; i < threadNum; i++ {
-		go analyzeWorker(i, ch, &wg, sess, stats, log)
+		go analyzeWorker(i, ch, &wg, sess, st)
 	}
 
 	// Feed repos to the analyzer workers
@@ -66,7 +68,8 @@ func AnalyzeRepositories(sess *Session, stats *stats.Stats, log *log.Logger) {
 	wg.Wait()
 }
 
-func analyzeWorker(tid int, ch chan _coreapi.Repository, wg *sync.WaitGroup, sess *Session, stats *stats.Stats, log *log.Logger) {
+func analyzeWorker(tid int, ch chan coreapi.Repository, wg *sync.WaitGroup, sess *session.Session, st *stats.Stats) {
+	log := log.Log
 	for {
 		log.Debug("[THREAD #%d] Requesting new repository to analyze...", tid)
 		repo, ok := <-ch
@@ -80,37 +83,37 @@ func analyzeWorker(tid int, ch chan _coreapi.Repository, wg *sync.WaitGroup, ses
 		// The path variable is returning the path that the clone was done to. The repo is cloned directly
 		// there.
 		log.Debug("[THREAD #%d][%s] Cloning repository...", tid, repo.CloneURL)
-		clone, path, err := cloneRepository(sess.Config, stats.IncrementRepositoriesCloned, repo)
+		clone, path, err := cloneRepository(sess.Config, st.IncrementRepositoriesCloned, repo)
 		if err != nil {
 			log.Error("%v", err)
-			cleanUpPath(path, log)
+			cleanUpPath(path)
 			continue
 		}
 		log.Debug("[THREAD #%d][%s] Cloned repository to: %s", tid, repo.CloneURL, path)
 
-		sess.analyzeHistory(clone, tid, path, repo)
+		analyzeHistory(sess, clone, tid, path, repo)
 
 		log.Debug("[THREAD #%d][%s] Done analyzing commits", tid, repo.CloneURL)
 		log.Debug("[THREAD #%d][%s] Deleted %s", tid, repo.CloneURL, path)
 
-		cleanUpPath(path, log)
-		stats.IncrementRepositoriesScanned()
+		cleanUpPath(path)
+		st.IncrementRepositoriesScanned()
 	}
 }
 
-func cleanUpPath(path string, log *log.Logger) {
+func cleanUpPath(path string) {
 	err := os.RemoveAll(path)
 	if err != nil {
-		log.Error("Could not remove path from disk: %s", err.Error())
+		log.Log.Error("Could not remove path from disk: %s", err.Error())
 	}
 }
 
-func (sess *Session) analyzeHistory(clone *git.Repository, tid int, path string, repo _coreapi.Repository) {
+func analyzeHistory(sess *session.Session, clone *_git.Repository, tid int, path string, repo coreapi.Repository) {
 	stats := sess.State.Stats
-	log := sess.Out
+	log := log.Log
 
 	// Get the full commit history for the repo
-	history, err := _git.GetRepositoryHistory(clone)
+	history, err := git.GetRepositoryHistory(clone)
 	if err != nil {
 		log.Error("[THREAD #%d][%s] Cannot get full commit history, error: %v", tid, repo.CloneURL, err)
 		if err := os.RemoveAll(path); err != nil {
@@ -137,7 +140,7 @@ func (sess *Session) analyzeHistory(clone *git.Repository, tid int, path string,
 		// it is found.
 		stats.IncrementCommitsScanned()
 
-		if yes := sess.isDirtyCommit(commit, repo, clone, path, tid); yes {
+		if yes := isDirtyCommit(sess, commit, repo, clone, path, tid); yes {
 			// Increment the number of commits that were found to be dirty
 			stats.IncrementCommitsDirty()
 		}
@@ -145,16 +148,16 @@ func (sess *Session) analyzeHistory(clone *git.Repository, tid int, path string,
 }
 
 // isDirtyCommit will analyze all the changes and return bool if there's a dirty commit
-func (sess *Session) isDirtyCommit(commit *object.Commit, repo _coreapi.Repository, clone *git.Repository, path string, tid int) bool {
+func isDirtyCommit(sess *session.Session, commit *object.Commit, repo coreapi.Repository, clone *_git.Repository, path string, tid int) bool {
 	stats := sess.State.Stats
-	log := sess.Out
+	log := log.Log
 
 	// This will be used to increment the dirty commit stat if any matches are found. A dirty commit
 	// means that a secret was found in that commit. This provides an easier way to manually to look
 	// through the commit history of a given repo.
 	dirtyCommit := false
 
-	changes, _ := _git.GetChanges(commit, clone)
+	changes, _ := git.GetChanges(commit, clone)
 	log.Debug("[THREAD #%d][%s] %d changes in %s", tid, repo.CloneURL, len(changes), commit.Hash)
 
 	for _, change := range changes {
@@ -162,10 +165,10 @@ func (sess *Session) isDirtyCommit(commit *object.Commit, repo _coreapi.Reposito
 		stats.IncrementFilesTotal()
 
 		// TODO Is this need for the finding object, why are we saving this?
-		changeAction := _git.GetChangeAction(change)
+		changeAction := git.GetChangeAction(change)
 
 		// TODO Add an example of the output from this function
-		fPath := _git.GetChangePath(change)
+		fPath := git.GetChangePath(change)
 
 		// TODO Add an example of this
 		fullFilePath := path + "/" + fPath
@@ -176,13 +179,13 @@ func (sess *Session) isDirtyCommit(commit *object.Commit, repo _coreapi.Reposito
 		// Check if file has to be ignored
 		if ok, msg := ignoredFile(sess.Config.Global.ScanTests, sess.Config.Global.MaxFileSize, fullFilePath, mf, sess.Config.Global.SkippableExt, sess.Config.Global.SkippablePath); ok {
 			log.Debug("[THREAD #%d][%s] %s %s", tid, repo.CloneURL, fPath, msg)
-			stats.IncrementFilesIgnored()
+			stats.IncrementIgnoredFiles()
 			continue
 		}
 
 		// We are now finally at the point where we are going to scan a file so we implement
 		// that count.
-		stats.IncrementFilesScanned()
+		stats.IncrementScannedFiles()
 
 		// We set this to a default of false and will be used at the end of matching to
 		// increment the file count. If we try and do this in the loop it will hit for every
@@ -190,7 +193,7 @@ func (sess *Session) isDirtyCommit(commit *object.Commit, repo _coreapi.Reposito
 		// dirtyFile := false
 
 		// call signaturesfunc
-		dirtyFile, dcommit, ignored, out := signatures.Discover(mf, change, sess.Config, sess.Signatures, log)
+		dirtyFile, dcommit, ignored, out := signatures.Discover(mf, change, sess.Config, sess.Signatures)
 		for _, v := range out {
 			fin := &finding.Finding{
 				Action:           changeAction,
@@ -213,18 +216,18 @@ func (sess *Session) isDirtyCommit(commit *object.Commit, repo _coreapi.Reposito
 			sess.State.AddFinding(fin)
 			log.Debug("[THREAD #%d][%s] Done analyzing changes in %s", tid, repo.CloneURL, commit.Hash)
 
-			// // Print realtime data to stdout
-			fin.RealtimeOutput(sess.Config.Global, log)
+			// Print realtime data to stdout
+			fin.RealtimeOutput(sess.Config.Global)
 		}
 
 		if dirtyFile {
-			stats.IncrementFilesDirty()
+			stats.IncrementDirtyFiles()
 		}
 		if dcommit {
 			dirtyCommit = dcommit
 		}
 		if ignored > 0 {
-			stats.IncrementFilesIgnoredWith(ignored)
+			stats.IncrementIgnoredFilesWith(ignored)
 		}
 	}
 	return dirtyCommit

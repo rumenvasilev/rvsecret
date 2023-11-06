@@ -1,19 +1,30 @@
-package core
+package session
 
 import (
-	_coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
+	"sync"
+
+	coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
 	"github.com/rumenvasilev/rvsecret/internal/core/finding"
+	"github.com/rumenvasilev/rvsecret/internal/stats"
 )
 
+type State struct {
+	*sync.Mutex
+	Stats        *stats.Stats
+	Findings     []*finding.Finding
+	Targets      []*coreapi.Owner
+	Repositories []*coreapi.Repository
+}
+
 // AddTargets would iterate over the list and call AddTarget to append each one to the state list
-func (st *State) AddTargets(targets []*_coreapi.Owner) {
+func (st *State) AddTargets(targets []*coreapi.Owner) {
 	for _, v := range targets {
 		st.AddTarget(v)
 	}
 }
 
 // AddTarget will add a new target to a session to be scanned during that session
-func (st *State) AddTarget(target *_coreapi.Owner) {
+func (st *State) AddTarget(target *coreapi.Owner) {
 	st.Lock()
 	defer st.Unlock()
 	for _, t := range st.Targets {
@@ -25,9 +36,9 @@ func (st *State) AddTarget(target *_coreapi.Owner) {
 
 	// Update statistics
 	switch *target.Kind {
-	case _coreapi.TargetTypeOrganization:
+	case coreapi.TargetTypeOrganization:
 		st.Stats.IncrementOrgs()
-	case _coreapi.TargetTypeUser:
+	case coreapi.TargetTypeUser:
 		st.Stats.IncrementUsers()
 	}
 	st.Stats.IncrementTargets()
@@ -35,7 +46,7 @@ func (st *State) AddTarget(target *_coreapi.Owner) {
 
 // AddRepository will add a given repository to be scanned to a session. This counts as
 // the total number of repos that have been gathered during a session.
-func (st *State) AddRepository(repository *_coreapi.Repository) {
+func (st *State) AddRepository(repository *coreapi.Repository) {
 	st.Lock()
 	defer st.Unlock()
 	for _, r := range st.Repositories {

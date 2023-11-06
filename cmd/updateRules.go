@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"github.com/rumenvasilev/rvsecret/internal/config"
-	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/signatures"
 
@@ -25,8 +24,7 @@ var updateSignaturesCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		log := log.NewLogger(cfg.Global.Debug, cfg.Global.Silent)
-		return signatures.Update(cfg, log)
+		return signatures.Update(cfg)
 	},
 }
 

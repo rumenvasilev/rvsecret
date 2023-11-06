@@ -11,7 +11,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func SaveConfig(log *log.Logger) error {
+func SaveConfig() error {
+	log := log.Log
 	log.Info("Creating configuration file")
 	// implementation here
 	// load config

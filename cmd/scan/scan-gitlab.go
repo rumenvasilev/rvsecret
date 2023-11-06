@@ -4,7 +4,6 @@ package scan
 
 import (
 	"github.com/rumenvasilev/rvsecret/internal/config"
-	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/scan"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/spf13/cobra"
@@ -21,8 +20,7 @@ var scanGitlabCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		log := log.NewLogger(cfg.Global.Debug, cfg.Global.Silent)
-		return scan.New(cfg, log).Do()
+		return scan.New(cfg).Run()
 	},
 }
 

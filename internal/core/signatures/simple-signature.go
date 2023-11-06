@@ -1,8 +1,7 @@
 package signatures
 
 import (
-	"github.com/rumenvasilev/rvsecret/internal/log"
-	"github.com/rumenvasilev/rvsecret/internal/matchfile"
+	"github.com/rumenvasilev/rvsecret/internal/core/matchfile"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 )
@@ -14,7 +13,7 @@ type SimpleSignature struct {
 }
 
 // ExtractMatch will attempt to match a path or file name of the given file
-func (s SimpleSignature) ExtractMatch(file matchfile.MatchFile, change *object.Change, scanType api.ScanType, log *log.Logger) (bool, map[string]int) {
+func (s SimpleSignature) ExtractMatch(file matchfile.MatchFile, change *object.Change, scanType api.ScanType) (bool, map[string]int) {
 	var haystack string
 
 	switch s.part {

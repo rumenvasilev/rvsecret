@@ -68,7 +68,8 @@ func (f *Finding) setupUrls(scanType api.ScanType, gheURL string) {
 	}
 }
 
-func (f *Finding) RealtimeOutput(cfg config.Global, log *log.Logger) {
+func (f *Finding) RealtimeOutput(cfg config.Global) {
+	log := log.Log
 	if !cfg.Silent && !cfg.CSVOutput && !cfg.JSONOutput {
 		log.Warn(" %s", strings.ToUpper(f.Description))
 		log.Info("  SignatureID..........: %s", f.SignatureID)
@@ -88,45 +89,5 @@ func (f *Finding) RealtimeOutput(cfg config.Global, log *log.Logger) {
 
 		log.Info(" ------------------------------------------------")
 		log.Info("")
-	}
-}
-
-func GetFindingsCSVHeader() []string {
-	return []string{
-		"FilePath",
-		"Line Number",
-		"Action",
-		"Description",
-		"SignatureID",
-		"Finding List",
-		"Repo Owner",
-		"Repo Name",
-		"Commit Hash",
-		"Commit Message",
-		"Commit Author",
-		"File URL",
-		"Secret ID",
-		"App Version",
-		"Signatures Version",
-	}
-}
-
-func (f *Finding) ToCSV() []string {
-	return []string{
-		f.FilePath,
-		f.LineNumber,
-		f.Action,
-		f.Description,
-		f.SignatureID,
-		f.Content,
-		f.RepositoryOwner,
-		f.RepositoryName,
-		f.CommitHash,
-		f.CommitMessage,
-		f.CommitAuthor,
-		f.FileURL,
-		f.SecretID,
-		f.AppVersion,
-		f.SignatureVersion,
 	}
 }

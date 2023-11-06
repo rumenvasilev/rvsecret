@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/mitchellh/go-homedir"
+	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 	"github.com/rumenvasilev/rvsecret/version"
@@ -194,6 +195,8 @@ func SetConfig(cmd *cobra.Command) {
 // Load depends on cfg being initialized and populated, otherwise it will panic
 func Load(scanType api.ScanType) (*Config, error) {
 	// set configuration
+	log.SetDebug(cfg.Global.Debug)
+	log.SetSilent(cfg.Global.Silent)
 	cfg.Global.ScanType = scanType
 
 	switch scanType {

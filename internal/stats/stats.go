@@ -3,27 +3,35 @@ package stats
 import (
 	"sync"
 	"time"
+)
 
-	_coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
+type Status string
+
+// These are various environment variables and tool statuses used in auth and displaying messages
+const (
+	StatusInitializing Status = "initializing"
+	StatusGathering    Status = "gathering"
+	StatusAnalyzing    Status = "analyzing"
+	StatusFinished     Status = "finished"
 )
 
 // Stats hold various runtime statistics used for perf data as well generating various reports
 // They are accessed from the web server as well
 type Stats struct {
 	*sync.Mutex
-	StartedAt           time.Time       // The time we started the scan
-	FinishedAt          time.Time       // The time we finished the scan
-	Status              _coreapi.Status // The running status of a scan for the web interface
-	Progress            float64         // The running progress for the bar on the web interface
-	RepositoriesTotal   int             // The toatal number of repos discovered
-	RepositoriesScanned int             // The total number of repos scanned (not excluded, errors, empty)
-	RepositoriesCloned  int             // The total number of repos cloned (excludes errors and excluded, includes empty)
-	Organizations       int             // The number of github orgs
-	CommitsScanned      int             // The number of commits scanned in a repo
-	CommitsDirty        int             // The number of commits in a repo found to have secrets
-	FilesScanned        int             // The number of files actually scanned
-	FilesIgnored        int             // The number of files ignored (tests, extensions, paths)
-	FilesTotal          int             // The total number of files that were processed
+	StartedAt           time.Time // The time we started the scan
+	FinishedAt          time.Time // The time we finished the scan
+	Status              Status    // The running status of a scan for the web interface
+	Progress            float64   // The running progress for the bar on the web interface
+	RepositoriesTotal   int       // The toatal number of repos discovered
+	RepositoriesScanned int       // The total number of repos scanned (not excluded, errors, empty)
+	RepositoriesCloned  int       // The total number of repos cloned (excludes errors and excluded, includes empty)
+	Organizations       int       // The number of github orgs
+	CommitsScanned      int       // The number of commits scanned in a repo
+	CommitsDirty        int       // The number of commits in a repo found to have secrets
+	FilesScanned        int       // The number of files actually scanned
+	FilesIgnored        int       // The number of files ignored (tests, extensions, paths)
+	FilesTotal          int       // The total number of files that were processed
 	FilesDirty          int
 	FindingsTotal       int // The total number of findings. There can be more than one finding per file and more than one finding of the same type in a file
 	Users               int // Github users
@@ -45,7 +53,7 @@ func Init() *Stats {
 		Organizations: 0,
 		Progress:      0.0,
 		StartedAt:     time.Now(),
-		Status:        _coreapi.StatusFinished,
+		Status:        StatusInitializing,
 		Users:         0,
 		Targets:       0,
 		Repositories:  0,
@@ -55,7 +63,7 @@ func Init() *Stats {
 	}
 }
 
-func (s *Stats) UpdateStatus(to _coreapi.Status) {
+func (s *Stats) UpdateStatus(to Status) {
 	s.Lock()
 	defer s.Unlock()
 	s.Status = to
@@ -119,31 +127,31 @@ func (s *Stats) IncrementFilesTotal() {
 	s.FilesTotal++
 }
 
-// IncrementFilesDirty will bump the count of files that have been discovered. This does not reflect
+// IncrementDirtyFiles will bump the count of files that have been discovered. This does not reflect
 // if the file was scanned/skipped. It is simply a count of files that were found.
-func (s *Stats) IncrementFilesDirty() {
+func (s *Stats) IncrementDirtyFiles() {
 	s.Lock()
 	defer s.Unlock()
 	s.FilesDirty++
 }
 
-// IncrementFilesScanned will bump the count of files that have been scanned successfully.
-func (s *Stats) IncrementFilesScanned() {
+// IncrementScannedFiles will bump the count of files that have been scanned successfully.
+func (s *Stats) IncrementScannedFiles() {
 	s.Lock()
 	defer s.Unlock()
 	s.FilesScanned++
 	s.Files++
 }
 
-// IncrementFilesIgnored will bump the number of files that have been ignored for various reasons.
-func (s *Stats) IncrementFilesIgnored() {
+// IncrementIgnoredFiles will bump the number of files that have been ignored for various reasons.
+func (s *Stats) IncrementIgnoredFiles() {
 	s.Lock()
 	defer s.Unlock()
 	s.FilesIgnored++
 }
 
-// IncrementFilesIgnoredWith will bump the number of files that have been ignored with a number.
-func (s *Stats) IncrementFilesIgnoredWith(amount int) {
+// IncrementIgnoredFilesWith will bump the number of files that have been ignored with a number.
+func (s *Stats) IncrementIgnoredFilesWith(amount int) {
 	s.Lock()
 	defer s.Unlock()
 	s.FilesIgnored += amount

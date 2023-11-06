@@ -17,11 +17,10 @@ import (
 // Client holds a github api client instance
 type Client struct {
 	apiClient *github.Client
-	logger    *log.Logger
 }
 
 // NewClient creates a gitlab api client instance using a token
-func NewClient(token, gheURL string, logger *log.Logger) (*Client, error) {
+func NewClient(token, gheURL string) (*Client, error) {
 	err := validateAPIToken(token)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create new Github client, %w", err)
@@ -29,22 +28,21 @@ func NewClient(token, gheURL string, logger *log.Logger) (*Client, error) {
 	// Get OAuth client
 	oauth := getOauthClient(token)
 	if gheURL != "" {
-		return newEnterpriseClient(oauth, gheURL, logger)
+		return newEnterpriseClient(oauth, gheURL)
 	}
-	return newStandardClient(oauth, logger), nil
+	return newStandardClient(oauth), nil
 }
 
-func newStandardClient(oauth *http.Client, logger *log.Logger) *Client {
+func newStandardClient(oauth *http.Client) *Client {
 	c := github.NewClient(oauth)
 	c.UserAgent = version.UserAgent
 
 	return &Client{
 		apiClient: c,
-		logger:    logger,
 	}
 }
 
-func newEnterpriseClient(oauth *http.Client, gheURL string, logger *log.Logger) (*Client, error) {
+func newEnterpriseClient(oauth *http.Client, gheURL string) (*Client, error) {
 	baseURL := fmt.Sprintf("%s/api/v3", gheURL)
 	uploadURL := fmt.Sprintf("%s/api/uploads", gheURL)
 
@@ -58,7 +56,6 @@ func newEnterpriseClient(oauth *http.Client, gheURL string, logger *log.Logger) 
 
 	return &Client{
 		apiClient: c,
-		logger:    logger,
 	}, nil
 }
 
@@ -79,12 +76,13 @@ func validateAPIToken(token string) error {
 
 // GetUserOrganization is used to enumerate the owner in a given org
 func (c *Client) GetUserOrganization(ctx context.Context, name string) (*_coreapi.Owner, error) {
+	log := log.Log
 	res, err := c.getUser(ctx, name)
 	// Couldn't find user by that name, try organization instead
 	// TODO perhaps we should pass config argument which one are we searching for
 	if err != nil {
-		c.logger.Warn("Couldn't find user under that name %q. Will search for org instead.", name)
-		c.logger.Debug("Wrapped error: %q", err.Error())
+		log.Warn("Couldn't find user under that name %q. Will search for org instead.", name)
+		log.Debug("Wrapped error: %q", err.Error())
 		return c.getOrg(ctx, name)
 	}
 	return res, nil
@@ -135,12 +133,13 @@ func (c *Client) getOrg(ctx context.Context, name string) (*_coreapi.Owner, erro
 // GetRepositoriesFromOwner is used gather all the repos associated with the org owner or other user.
 // This is only used by the gitlab client. The github client use a github specific function.
 func (c *Client) GetRepositoriesFromOwner(ctx context.Context, target _coreapi.Owner) ([]*_coreapi.Repository, error) {
+	log := log.Log
 	switch *target.Kind {
 	case _coreapi.TargetTypeOrganization:
-		c.logger.Debug("We're searching all org repositories...")
+		log.Debug("We're searching all org repositories...")
 		return c.getOrgRepositories(ctx, *target.Login)
 	case _coreapi.TargetTypeUser:
-		c.logger.Debug("We're searching all user repositories...")
+		log.Debug("We're searching all user repositories...")
 		return c.getUserRepositories(ctx, *target.Login)
 	default:
 		return nil, fmt.Errorf("unsupported target type %q", *target.Kind)

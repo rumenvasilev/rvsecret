@@ -7,7 +7,7 @@ import (
 	"github.com/migueleliasweb/go-github-mock/src/mock"
 )
 
-var mockedHTTPClient = mock.NewMockedHTTPClient(
+var mockedURL = mock.NewMockedHTTPClient(
 	mock.WithRequestMatch(
 		mock.GetUsersByUsername,
 		github.User{
@@ -20,10 +20,10 @@ var mockedHTTPClient = mock.NewMockedHTTPClient(
 			Name: github.String("foobar123thisorgwasmocked"),
 		},
 	),
-	mock.WithRequestMatch(
+	mock.WithRequestMatchPages(
 		mock.GetOrgsReposByOrg,
 		[]*github.Repository{
-			&github.Repository{
+			{
 				ID: github.Int64(5),
 				Owner: &github.User{
 					Login: github.String("petko"),
@@ -35,8 +35,11 @@ var mockedHTTPClient = mock.NewMockedHTTPClient(
 				DefaultBranch: github.String("maine"),
 				Description:   github.String("no description now"),
 				Homepage:      github.String("www.homepage.fake"),
-				Fork:          github.Bool(false)},
-			&github.Repository{
+				Fork:          github.Bool(false),
+			},
+		},
+		[]*github.Repository{
+			{
 				ID: github.Int64(5),
 				Owner: &github.User{
 					Login: github.String("schmetko"),
@@ -48,13 +51,14 @@ var mockedHTTPClient = mock.NewMockedHTTPClient(
 				DefaultBranch: github.String("maine"),
 				Description:   github.String("no description now"),
 				Homepage:      github.String("www.homepage.fake"),
-				Fork:          github.Bool(false)},
+				Fork:          github.Bool(false),
+			},
 		},
 	),
-	mock.WithRequestMatch(
+	mock.WithRequestMatchPages(
 		mock.GetUsersReposByUsername,
 		[]*github.Repository{
-			&github.Repository{
+			{
 				ID: github.Int64(5),
 				Owner: &github.User{
 					Login: github.String("petko"),
@@ -66,8 +70,11 @@ var mockedHTTPClient = mock.NewMockedHTTPClient(
 				DefaultBranch: github.String("maine"),
 				Description:   github.String("no description now"),
 				Homepage:      github.String("www.homepage.fake"),
-				Fork:          github.Bool(false)},
-			&github.Repository{
+				Fork:          github.Bool(false),
+			},
+		},
+		[]*github.Repository{
+			{
 				ID: github.Int64(5),
 				Owner: &github.User{
 					Login: github.String("schmetko"),
@@ -79,15 +86,23 @@ var mockedHTTPClient = mock.NewMockedHTTPClient(
 				DefaultBranch: github.String("maine"),
 				Description:   github.String("no description now"),
 				Homepage:      github.String("www.homepage.fake"),
-				Fork:          github.Bool(false)},
+				Fork:          github.Bool(false),
+			},
 		},
 	),
-	mock.WithRequestMatch(
+	mock.WithRequestMatchPages(
 		mock.GetOrgsMembersByOrg,
 		[]*github.User{
-			&github.User{
+			{
 				Login: github.String("faking-it"),
 				ID:    github.Int64(7),
+				Type:  github.String("unknown"),
+			},
+		},
+		[]*github.User{
+			{
+				Login: github.String("faking-it-2"),
+				ID:    github.Int64(5),
 				Type:  github.String("unknown"),
 			},
 		},
@@ -115,6 +130,79 @@ var mockedHTTPClient = mock.NewMockedHTTPClient(
 					Name: github.String("mocked-proj-2"),
 				},
 			}))
+		}),
+	),
+)
+
+var mockedURLErrorUserOrg = mock.NewMockedHTTPClient( // Test_GetUserOrganization
+	mock.WithRequestMatchHandler(
+		mock.GetUsersByUsername,
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mock.WriteError(
+				w,
+				http.StatusNotFound,
+				"getUser failed",
+			)
+		}),
+	),
+
+	mock.WithRequestMatch(
+		mock.GetOrgsByOrg,
+		github.Organization{
+			Name: github.String("foobar123thisorgwasmocked"),
+		},
+	),
+)
+
+var mockedURLError = mock.NewMockedHTTPClient(
+	mock.WithRequestMatchHandler(
+		mock.GetOrgsByOrg,
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mock.WriteError(
+				w,
+				http.StatusNotFound,
+				"getOrg failed",
+			)
+		}),
+	),
+	mock.WithRequestMatchHandler(
+		mock.GetOrgsReposByOrg,
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mock.WriteError(
+				w,
+				http.StatusNotFound,
+				"getOrgRepositories failed",
+			)
+		}),
+	),
+	mock.WithRequestMatchHandler(
+		mock.GetUsersReposByUsername,
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mock.WriteError(
+				w,
+				http.StatusNotFound,
+				"getUserRepositories failed",
+			)
+		}),
+	),
+	mock.WithRequestMatchHandler(
+		mock.GetReposReleasesLatestByOwnerByRepo,
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mock.WriteError(
+				w,
+				http.StatusNotFound,
+				"GetLatestRelease failed",
+			)
+		}),
+	),
+	mock.WithRequestMatchHandler(
+		mock.GetReposReleasesTagsByOwnerByRepoByTag,
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mock.WriteError(
+				w,
+				http.StatusNotFound,
+				"GetReleaseByTag failed",
+			)
 		}),
 	),
 )

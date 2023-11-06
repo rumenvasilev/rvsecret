@@ -34,13 +34,3 @@ type Repository struct {
 	Homepage      string // WHY DO WE NEED THIS FIELD???
 	ID            int64
 }
-
-type Status string
-
-// These are various environment variables and tool statuses used in auth and displaying messages
-const (
-	StatusInitializing Status = "initializing"
-	StatusGathering    Status = "gathering"
-	StatusAnalyzing    Status = "analyzing"
-	StatusFinished     Status = "finished"
-)

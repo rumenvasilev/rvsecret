@@ -9,10 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rumenvasilev/rvsecret/internal/core"
 	"github.com/rumenvasilev/rvsecret/internal/core/finding"
+	"github.com/rumenvasilev/rvsecret/internal/core/matchfile"
 	"github.com/rumenvasilev/rvsecret/internal/core/signatures"
-	"github.com/rumenvasilev/rvsecret/internal/matchfile"
+	"github.com/rumenvasilev/rvsecret/internal/log"
+	"github.com/rumenvasilev/rvsecret/internal/session"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 	"github.com/rumenvasilev/rvsecret/version"
 
@@ -20,8 +21,8 @@ import (
 )
 
 // DoFileScan with create a match object and then test for various criteria necessary in order to determine if it should be scanned. This includes if it should be skipped due to a default or user supplied extension, if it matches a test regex, or is in a protected directory or is itself protected. This will only run when doing scanLocalPath.
-func doFileScan(filename string, sess *core.Session) {
-	log := sess.Out
+func doFileScan(filename string, sess *session.Session) {
+	log := log.Log
 	// Set default values for all pre-requisites for a file scan
 	likelyTestFile := false
 
@@ -31,7 +32,7 @@ func doFileScan(filename string, sess *core.Session) {
 	mf := matchfile.New(filename)
 	if mf.IsSkippable(sess.Config.Global.SkippableExt, sess.Config.Global.SkippablePath) {
 		log.Debug("%s is listed as skippable and is being ignored", filename)
-		sess.State.Stats.IncrementFilesIgnored()
+		sess.State.Stats.IncrementIgnoredFiles()
 		return
 	}
 
@@ -44,7 +45,7 @@ func doFileScan(filename string, sess *core.Session) {
 
 	if likelyTestFile {
 		// We want to know how many files have been ignored
-		sess.State.Stats.IncrementFilesIgnored()
+		sess.State.Stats.IncrementIgnoredFiles()
 		log.Debug("%s is a test file and being ignored", filename)
 		return
 	}
@@ -53,7 +54,7 @@ func doFileScan(filename string, sess *core.Session) {
 	// then we increment the ignored file count and pass on through.
 	val, msg := util.IsMaxFileSize(filename, sess.Config.Global.MaxFileSize)
 	if val {
-		sess.State.Stats.IncrementFilesIgnored()
+		sess.State.Stats.IncrementIgnoredFiles()
 		log.Debug("%s %s", filename, msg)
 		return
 	}
@@ -64,9 +65,9 @@ func doFileScan(filename string, sess *core.Session) {
 	}
 
 	// Increment the number of files scanned
-	sess.State.Stats.IncrementFilesScanned()
+	sess.State.Stats.IncrementScannedFiles()
 	// Scan the file for know signatures
-	dirtyFile, _, ignored, out := signatures.Discover(mf, nil, sess.Config, sess.Signatures, log)
+	dirtyFile, _, ignored, out := signatures.Discover(mf, nil, sess.Config, sess.Signatures)
 	for _, v := range out {
 		fin := &finding.Finding{
 			Action:           `File Scan`,
@@ -90,25 +91,25 @@ func doFileScan(filename string, sess *core.Session) {
 		sess.State.AddFinding(fin)
 
 		// print the current finding to stdout
-		fin.RealtimeOutput(sess.Config.Global, log)
+		fin.RealtimeOutput(sess.Config.Global)
 	}
 	if dirtyFile {
-		sess.State.Stats.IncrementFilesDirty()
+		sess.State.Stats.IncrementDirtyFiles()
 	}
 	if ignored > 0 {
-		sess.State.Stats.IncrementFilesIgnoredWith(ignored)
+		sess.State.Stats.IncrementIgnoredFilesWith(ignored)
 	}
 }
 
 // ScanDir will scan a directory for all the files and then kick a file scan on each of them
-func scanDir(path string, sess *core.Session) {
+func scanDir(path string, sess *session.Session) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3600*time.Second)
 	defer cancel()
 
 	// get an slice of of all paths
 	files, err := search(ctx, path, sess.Config.Global.SkippablePath, sess)
 	if err != nil {
-		sess.Out.Error("There is an error scanning %s: %s", path, err.Error())
+		log.Log.Error("There is an error scanning %s: %s", path, err.Error())
 	}
 
 	maxThreads := 100
@@ -132,8 +133,8 @@ func scanDir(path string, sess *core.Session) {
 }
 
 // Search will walk the path or a given directory and append each viable path to an array
-func search(ctx context.Context, root string, skippablePath []string, sess *core.Session) ([]string, error) {
-	sess.Out.Important("Enumerating Paths")
+func search(ctx context.Context, root string, skippablePath []string, sess *session.Session) ([]string, error) {
+	log.Log.Important("Enumerating Paths")
 	g, ctx := errgroup.WithContext(ctx)
 	paths := make(chan string, 20)
 

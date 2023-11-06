@@ -13,5 +13,5 @@ const (
 )
 
 type Scanner interface {
-	Do() error
+	Run() error
 }

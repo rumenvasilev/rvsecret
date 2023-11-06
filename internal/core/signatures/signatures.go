@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/rumenvasilev/rvsecret/internal/config"
+	"github.com/rumenvasilev/rvsecret/internal/core/matchfile"
 	"github.com/rumenvasilev/rvsecret/internal/log"
-	"github.com/rumenvasilev/rvsecret/internal/matchfile"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
@@ -48,6 +48,9 @@ var SafeFunctionSignatures []SafeFunctionSignature
 
 // loadSignatureSet will read in the defined signatures from an external source
 func loadSignatureSet(filename string) (SignatureConfig, error) {
+	if !util.PathExists(filename) {
+		return SignatureConfig{}, errors.New("Couldn't find the path to signatures file")
+	}
 	bytes, err := os.ReadFile(filename)
 	if err != nil {
 		return SignatureConfig{}, err
@@ -66,7 +69,7 @@ func loadSignatureSet(filename string) (SignatureConfig, error) {
 type Signature interface {
 	Description() string
 	Enable() int
-	ExtractMatch(file matchfile.MatchFile, change *object.Change, scanType api.ScanType, log *log.Logger) (bool, map[string]int)
+	ExtractMatch(file matchfile.MatchFile, change *object.Change, scanType api.ScanType) (bool, map[string]int)
 	ConfidenceLevel() int
 	Part() string
 	SignatureID() string // TODO change id -> ID
@@ -145,9 +148,11 @@ func fetchLineNumber(input *[]string, thisMatch string, idx int) int {
 }
 
 // Load will load all known signatures for the various match types into the session
+// Returns a slice of loaded signatures, signatures bundle version and an error
 func Load(filePath string, mLevel int) ([]Signature, string, error) {
+	f := strings.TrimSpace(filePath)
 	// ensure that we have the proper home directory
-	fp, err := util.SetHomeDir(filePath)
+	fp, err := util.SetHomeDir(f)
 	if err != nil {
 		return []Signature{}, "", err
 	}
@@ -261,13 +266,13 @@ type DiscoverOutput struct {
 	LineNum int
 }
 
-func Discover(mf matchfile.MatchFile, change *object.Change, cfg *config.Config, sigs []Signature, log *log.Logger) (dirtyFile bool, dirtyCommit bool, ignored int, results []DiscoverOutput) {
+func Discover(mf matchfile.MatchFile, change *object.Change, cfg *config.Config, sigs []Signature) (dirtyFile bool, dirtyCommit bool, ignored int, results []DiscoverOutput) {
 	var content string
 	var errors = make(map[string]int)
 	// for each signature that is loaded scan the file as a whole and generate a map of
 	// the match and the line number the match was found on
 	for _, sig := range sigs {
-		ok, matchMap := sig.ExtractMatch(mf, change, cfg.Global.ScanType, log)
+		ok, matchMap := sig.ExtractMatch(mf, change, cfg.Global.ScanType)
 		if !ok {
 			util.MergeMaps(matchMap, errors)
 			continue
@@ -295,7 +300,7 @@ func Discover(mf matchfile.MatchFile, change *object.Change, cfg *config.Config,
 	ignored = len(errors)
 	if ignored > 0 {
 		for k, v := range errors {
-			log.Error("[Occurrences: %d]: %s", v, k)
+			log.Log.Error("[Occurrences: %d]: %s", v, k)
 		}
 	}
 	return //dirtyFile, dirtyCommit, ignored, results

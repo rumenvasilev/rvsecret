@@ -12,12 +12,13 @@ require (
 	github.com/migueleliasweb/go-github-mock v0.0.21
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/otiai10/copy v1.12.0
+	github.com/rumenvasilev/go-gitlab-mock v0.0.1
 	github.com/smartystreets/goconvey v1.8.1
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.16.0
 	github.com/stretchr/testify v1.8.3
 	github.com/whilp/git-urls v1.0.0
-	github.com/xanzy/go-gitlab v0.90.0
+	github.com/xanzy/go-gitlab v0.93.2
 	golang.org/x/oauth2 v0.11.0
 	golang.org/x/sync v0.3.0
 	gopkg.in/src-d/go-git.v4 v4.13.1

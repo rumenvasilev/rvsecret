@@ -4,34 +4,34 @@ import (
 	"time"
 
 	"github.com/rumenvasilev/rvsecret/internal/config"
-	"github.com/rumenvasilev/rvsecret/internal/core"
 	"github.com/rumenvasilev/rvsecret/internal/core/banner"
 	"github.com/rumenvasilev/rvsecret/internal/log"
+	"github.com/rumenvasilev/rvsecret/internal/output"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
+	"github.com/rumenvasilev/rvsecret/internal/session"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 	"github.com/rumenvasilev/rvsecret/internal/webserver"
 )
 
 type Localpath struct {
 	Cfg *config.Config
-	Log *log.Logger
 }
 
-func (l Localpath) Do() error {
+func (l Localpath) Run() error {
 	cfg := l.Cfg
-	log := l.Log
+	log := log.Log
 	// exclude the .git directory from local scans as it is not handled properly here
 	cfg.Global.SkippablePath = util.AppendIfMissing(cfg.Global.SkippablePath, ".git/")
 
 	// create session
-	sess, err := core.NewSessionWithConfig(cfg, log)
+	sess, err := session.NewWithConfig(cfg)
 	if err != nil {
 		return err
 	}
 
 	// Start webserver
 	if cfg.Global.WebServer && !cfg.Global.Silent {
-		ws := webserver.New(*cfg, sess.State, log)
+		ws := webserver.New(*cfg, sess.State)
 		go ws.Start()
 	}
 
@@ -43,7 +43,7 @@ func (l Localpath) Do() error {
 
 	// By default we display a header to the user giving basic info about application. This will not be displayed
 	// during a silent run which is the default when using this in an automated fashion.
-	banner.HeaderInfo(cfg.Global, sess.State.Stats.StartedAt.Format(time.RFC3339), len(sess.Signatures), log)
+	banner.HeaderInfo(cfg.Global, sess.State.Stats.StartedAt.Format(time.RFC3339), len(sess.Signatures))
 
 	for _, p := range cfg.Local.Paths {
 		if util.PathExists(p) {
@@ -58,7 +58,8 @@ func (l Localpath) Do() error {
 
 	sess.Finish()
 
-	if err := core.SummaryOutput(sess); err != nil {
+	err = output.Summary(sess.State, sess.Config.Global, sess.SignatureVersion)
+	if err != nil {
 		return err
 	}
 

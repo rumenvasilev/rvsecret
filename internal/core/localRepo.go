@@ -9,6 +9,9 @@ import (
 	"strings"
 
 	_coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
+	"github.com/rumenvasilev/rvsecret/internal/log"
+	"github.com/rumenvasilev/rvsecret/internal/session"
+	"github.com/rumenvasilev/rvsecret/internal/stats"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 
 	"gopkg.in/src-d/go-git.v4"
@@ -16,24 +19,24 @@ import (
 
 // GatherLocalRepositories will grab all the local repos from the user input and generate a repository
 // object, putting dummy or generated values in where necessary.
-func (sess *Session) GatherLocalRepositories() error {
-	// log := sess.Out
+func GatherLocalRepositories(sess *session.Session) error {
+	log := log.Log
 	// This is the number of targets as we don't do forks or anything else.
 	// It will contain directories, that will then be added to the repo count
 	// if they contain a .git directory
 	// TODO - must use a method, to be memsafe like everything else
 	sess.State.Stats.Targets = len(sess.Config.Local.Repos)
-	sess.State.Stats.UpdateStatus(_coreapi.StatusGathering)
-	sess.Out.Important("Gathering Local Repositories...")
+	sess.State.Stats.UpdateStatus(stats.StatusGathering)
+	log.Important("Gathering Local Repositories...")
 
 	for _, pth := range sess.Config.Local.Repos {
 
 		if !util.PathExists(pth) {
 			return fmt.Errorf("[*] <%s> does not exist! Quitting", pth)
 		}
-		err := sess.pathWalker(pth)
+		err := pathWalker(pth, sess)
 		if err != nil {
-			sess.Out.Error("something went wrong with filepath walk: %v", err)
+			log.Error("something went wrong with filepath walk: %v", err)
 			return err
 		}
 	}
@@ -42,11 +45,12 @@ func (sess *Session) GatherLocalRepositories() error {
 
 // pathWalker will walk all the paths and for each path it finds a repository
 // will append to the state repository list for later inspection
-func (sess *Session) pathWalker(pth string) error {
+func pathWalker(pth string, sess *session.Session) error {
+	log := log.Log
 	// Gather all paths in the tree
 	return filepath.Walk(pth, func(path string, f os.FileInfo, err1 error) error {
 		if err1 != nil {
-			sess.Out.Error("Failed to enumerate the path: %s", err1.Error())
+			log.Error("Failed to enumerate the path: %s", err1.Error())
 			return nil
 		}
 
@@ -68,14 +72,14 @@ func (sess *Session) pathWalker(pth string) error {
 		openRepo, err1 := git.PlainOpen(repoURL)
 		if err1 != nil {
 			// if err1 == git.ErrRepositoryNotExists {
-			sess.Out.Error(err1.Error())
+			log.Error(err1.Error())
 			// }
 			return nil
 		}
 
 		ref, err1 := openRepo.Head()
 		if err1 != nil {
-			sess.Out.Error("Failed to open the repo HEAD: %s", err1.Error())
+			log.Error("Failed to open the repo HEAD: %s", err1.Error())
 			return nil
 		}
 

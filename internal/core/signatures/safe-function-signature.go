@@ -3,8 +3,7 @@ package signatures
 import (
 	"regexp"
 
-	"github.com/rumenvasilev/rvsecret/internal/log"
-	"github.com/rumenvasilev/rvsecret/internal/matchfile"
+	"github.com/rumenvasilev/rvsecret/internal/core/matchfile"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 )
@@ -16,7 +15,7 @@ type SafeFunctionSignature struct {
 }
 
 // ExtractMatch is a placeholder to ensure min code complexity and allow the reuse of the functions
-func (s SafeFunctionSignature) ExtractMatch(file matchfile.MatchFile, change *object.Change, scanType api.ScanType, log *log.Logger) (bool, map[string]int) {
+func (s SafeFunctionSignature) ExtractMatch(file matchfile.MatchFile, change *object.Change, scanType api.ScanType) (bool, map[string]int) {
 	// var results map[string]int
 
 	return false, nil

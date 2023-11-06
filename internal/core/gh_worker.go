@@ -5,6 +5,7 @@ import (
 
 	_coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
 	"github.com/rumenvasilev/rvsecret/internal/log"
+	"github.com/rumenvasilev/rvsecret/internal/session"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 )
 
@@ -12,7 +13,8 @@ const retrievedRepo string = " Retrieved repository %s"
 
 // GetAllRepositoriesForOwner will find all repositories for an owner (user or org)
 // and populate the repositories state list (s.State.Repositories)
-func GetAllRepositoriesForOwner(ctx context.Context, login string, kind string, tid int, sess *Session, log *log.Logger) {
+func GetAllRepositoriesForOwner(ctx context.Context, login string, kind string, tid int, sess *session.Session) {
+	log := log.Log
 	// Retrieve all the repos in an org regardless of public/private
 	repos, err := sess.Client.GetRepositoriesFromOwner(ctx, _coreapi.Owner{
 		Login: util.StringToPointer(login),

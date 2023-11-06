@@ -14,9 +14,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rumenvasilev/rvsecret/assets"
 	"github.com/rumenvasilev/rvsecret/internal/config"
-	"github.com/rumenvasilev/rvsecret/internal/core"
 	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
+	"github.com/rumenvasilev/rvsecret/internal/session"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 )
 
@@ -36,18 +36,18 @@ const (
 // It's a blocking call, so it should be run in a goroutine
 func (e *Engine) Start() {
 	if err := e.Run(e.Listener); err != nil {
-		e.Logger.Fatal("Error when starting web server: %s", err)
+		log.Log.Fatal("Error when starting web server: %s", err)
 	}
 }
 
 type Engine struct {
 	*gin.Engine
-	*log.Logger
 	Listener string // address:port
 }
 
 // New will create an instance of the web frontend, setting the necessary parameters.
-func New(cfg config.Config, state *core.State, log *log.Logger) *Engine {
+func New(cfg config.Config, state *session.State) *Engine {
+	log := log.Log
 	gin.SetMode(gin.ReleaseMode)
 	if cfg.Global.Debug {
 		gin.SetMode(gin.DebugMode)
@@ -94,7 +94,6 @@ func New(cfg config.Config, state *core.State, log *log.Logger) *Engine {
 
 	return &Engine{
 		Listener: fmt.Sprintf("%s:%d", cfg.Global.BindAddress, cfg.Global.BindPort),
-		Logger:   log,
 		Engine:   router,
 	}
 }

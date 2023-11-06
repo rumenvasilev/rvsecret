@@ -2,13 +2,13 @@ package gitlab
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 
 	_coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
-	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/version"
 	"github.com/xanzy/go-gitlab"
 )
@@ -16,11 +16,10 @@ import (
 // Client holds a gitlab api client instance
 type Client struct {
 	apiClient *gitlab.Client
-	logger    *log.Logger
 }
 
 // NewClient creates a gitlab api client instance using a token
-func NewClient(token string, logger *log.Logger) (*Client, error) {
+func NewClient(token string) (*Client, error) {
 	err := validateAPIToken(token)
 	if err != nil {
 		return nil, err
@@ -34,7 +33,6 @@ func NewClient(token string, logger *log.Logger) (*Client, error) {
 
 	client := &Client{
 		apiClient: c,
-		logger:    logger,
 	}
 	return client, nil
 }
@@ -117,6 +115,9 @@ func (c *Client) GetOrganizationMembers(ctx context.Context, target _coreapi.Own
 
 // GetRepositoriesFromOwner is used gather all the repos associated with the org owner or other user
 func (c *Client) GetRepositoriesFromOwner(ctx context.Context, target _coreapi.Owner) ([]*_coreapi.Repository, error) {
+	if target.ID == nil || target.Type == nil {
+		return nil, errors.New("ID or Type fields are not present")
+	}
 	var allProjects []*_coreapi.Repository
 	id := int(*target.ID)
 	if *target.Type == _coreapi.TargetTypeUser {

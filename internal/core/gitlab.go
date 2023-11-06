@@ -5,14 +5,18 @@ import (
 	"sync"
 
 	_coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
+	"github.com/rumenvasilev/rvsecret/internal/log"
+	"github.com/rumenvasilev/rvsecret/internal/session"
+	"github.com/rumenvasilev/rvsecret/internal/stats"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 )
 
 // GatherTargets will enumerate git targets adding them to a running target list. This will set the targets based
 // on the scan type set within the cmd package.
-func GatherTargets(sess *Session) {
-	sess.State.Stats.UpdateStatus(_coreapi.StatusGathering)
-	sess.Out.Important("Gathering targets...")
+func GatherTargets(sess *session.Session) {
+	log := log.Log
+	sess.State.Stats.UpdateStatus(stats.StatusGathering)
+	log.Important("Gathering targets...")
 	ctx := context.Background()
 
 	// var targets []string
@@ -40,30 +44,30 @@ func GatherTargets(sess *Session) {
 		//if sess.ScanType == "github" || sess.ScanType == "github-enterprise" {
 		//	target, err := sess.GithubClient.GetUserOrganization(loginOption)
 		//	if err != nil || target == nil {
-		//		sess.Out.Error(" Error retrieving information on %s: %s\n", loginOption, err)
+		//		log.Error(" Error retrieving information on %s: %s\n", loginOption, err)
 		//		continue
 		//	}
 		//} else {
 		target, err := sess.Client.GetUserOrganization(ctx, loginOption)
 		if err != nil || target == nil {
-			sess.Out.Error(" Error retrieving information on %s: %s", loginOption, err)
+			log.Error(" Error retrieving information on %s: %s", loginOption, err)
 			continue
 		}
 
-		sess.Out.Debug("%s (ID: %d) type: %s", *target.Login, *target.ID, *target.Type)
+		log.Debug("%s (ID: %d) type: %s", *target.Login, *target.ID, *target.Type)
 		sess.State.AddTarget(target)
 		// If forking is false AND the target type is an Organization as set above in GetUserOrganization
 		if sess.Config.Global.ExpandOrgs && *target.Type == _coreapi.TargetTypeOrganization {
-			sess.Out.Debug("Gathering members of %s (ID: %d)...", *target.Login, *target.ID)
+			log.Debug("Gathering members of %s (ID: %d)...", *target.Login, *target.ID)
 			members, err := sess.Client.GetOrganizationMembers(ctx, *target)
 			if err != nil {
-				sess.Out.Error(" Error retrieving members of %s: %s", *target.Login, err)
+				log.Error(" Error retrieving members of %s: %s", *target.Login, err)
 				continue
 			}
 			// Add organization members gathered above to the target list
 			// TODO Do we want to spider this out at some point to enumerate all members of an org?
 			for _, member := range members {
-				sess.Out.Debug("Adding organization member %s (ID: %d) to targets", *member.Login, *member.ID)
+				log.Debug("Adding organization member %s (ID: %d) to targets", *member.Login, *member.ID)
 				sess.State.AddTarget(member)
 			}
 		}
@@ -73,8 +77,8 @@ func GatherTargets(sess *Session) {
 // GatherGitlabRepositories will gather all repositories associated with a given target during a scan session.
 // This is done using threads, whose count is set via commandline flag. Care much be taken to avoid rate
 // limiting associated with suspected DOS attacks.
-func GatherGitlabRepositories(sess *Session) {
-	log := sess.Out
+func GatherGitlabRepositories(sess *session.Session) {
+	log := log.Log
 	ctx := context.Background()
 	var ch = make(chan *_coreapi.Owner, len(sess.State.Targets))
 	log.Debug("Number of targets: %d", len(sess.State.Targets))

@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	_git "github.com/rumenvasilev/rvsecret/internal/core/git"
+	"github.com/rumenvasilev/rvsecret/internal/core/matchfile"
 	"github.com/rumenvasilev/rvsecret/internal/log"
-	"github.com/rumenvasilev/rvsecret/internal/matchfile"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
@@ -22,7 +22,7 @@ type PatternSignature struct {
 }
 
 // ExtractMatch will try and find a match within the content of the file.
-func (s PatternSignature) ExtractMatch(file matchfile.MatchFile, change *object.Change, scanType api.ScanType, log *log.Logger) (bool, map[string]int) {
+func (s PatternSignature) ExtractMatch(file matchfile.MatchFile, change *object.Change, scanType api.ScanType) (bool, map[string]int) {
 	switch s.part {
 	case PartPath:
 		return s.match.MatchString(file.Path), nil
@@ -31,13 +31,13 @@ func (s PatternSignature) ExtractMatch(file matchfile.MatchFile, change *object.
 	case PartExtension:
 		return s.match.MatchString(file.Extension), nil
 	case PartContent:
-		return s.partContent(file.Path, change, scanType, log)
+		return s.partContent(file.Path, change, scanType)
 	default: // TODO We need to do something with this
 		return false, nil
 	}
 }
 
-func (s PatternSignature) partContent(haystack string, change *object.Change, scanType api.ScanType, log *log.Logger) (bool, map[string]int) {
+func (s PatternSignature) partContent(haystack string, change *object.Change, scanType api.ScanType) (bool, map[string]int) {
 	var contextMatches []string
 	results := make(map[string]int) // the secret and the line number in a map
 
@@ -70,7 +70,7 @@ func (s PatternSignature) partContent(haystack string, change *object.Change, sc
 
 	content, err := _git.GetChangeContent(change)
 	if err != nil {
-		log.Error("Error retrieving content in commit %s, change %s: %s", "commit.String()", change.String(), err)
+		log.Log.Error("Error retrieving content in commit %s, change %s: %s", "commit.String()", change.String(), err)
 	}
 
 	if s.match.Match([]byte(content)) {

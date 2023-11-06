@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPluralize(t *testing.T) {
@@ -137,5 +138,85 @@ func TestCleanURLSpaces(t *testing.T) {
 				}
 			})
 		})
+	})
+}
+
+func Test_GenerateIDWithLen(t *testing.T) {
+	// 1 always generates the same hash
+	got := GenerateIDWithLen(1)
+	assert.Equal(t, "b6589fc6ab0dc82cf12099d1c2d40ab994e8410c", got)
+
+	// 1000 increases randomness so we cannot guarantee we'll have the same hash string output anymore
+	got = GenerateIDWithLen(1000)
+	assert.NotEmpty(t, got)
+}
+
+func Test_GetEntropyInt(t *testing.T) {
+	got := GetEntropyInt("a")
+	assert.Equal(t, float64(0), got)
+
+	got = GetEntropyInt("something else")
+	assert.Equal(t, float64(3.3248629576173565), got)
+}
+
+func Test_AppendToSlice(t *testing.T) {
+	t.Skip()
+}
+
+func Test_AppendIfMissing(t *testing.T) {
+	t.Run("append to empty", func(t *testing.T) {
+		got := AppendIfMissing([]string{}, "something else")
+		assert.Equal(t, []string{"something else"}, got)
+		assert.NotEqualValues(t, []string{}, got)
+	})
+
+	t.Run("value exist, no change", func(t *testing.T) {
+		got := AppendIfMissing([]string{"exist"}, "exist")
+		assert.Equal(t, []string{"exist"}, got)
+		assert.NotEqualValues(t, []string{"exist", "exist"}, got)
+	})
+
+	t.Run("value exist in the middle, no change", func(t *testing.T) {
+		got := AppendIfMissing([]string{"exist", "value1", "another"}, "value1")
+		assert.Equal(t, []string{"exist", "value1", "another"}, got)
+		assert.NotEqualValues(t, []string{"exist", "value1", "another", "value1"}, got)
+	})
+}
+
+func Test_MergeMaps(t *testing.T) {
+	t.Run("nil source", func(t *testing.T) {
+		dest := map[string]int{"something": 1}
+		MergeMaps(nil, dest)
+		assert.Exactly(t, map[string]int{"something": 1}, dest)
+	})
+
+	t.Run("nil dest", func(t *testing.T) {
+		source := map[string]int{"value": 7}
+		var dest map[string]int = nil
+		MergeMaps(source, dest)
+		assert.Nil(t, dest)
+	})
+
+	t.Run("empty, ok", func(t *testing.T) {
+		input := make(map[string]int)
+		want := make(map[string]int)
+		MergeMaps(input, want)
+		assert.Exactly(t, make(map[string]int), want)
+	})
+
+	t.Run("append only", func(t *testing.T) {
+		source := map[string]int{"bla": 7, "test": 1}
+		dest := map[string]int{"ok": 10}
+		want := map[string]int{"bla": 7, "test": 1, "ok": 10}
+		MergeMaps(source, dest)
+		assert.Exactly(t, want, dest)
+	})
+
+	t.Run("sum values for key", func(t *testing.T) {
+		source := map[string]int{"bla": 7, "test": 1}
+		dest := map[string]int{"bla": 10}
+		want := map[string]int{"bla": 17, "test": 1}
+		MergeMaps(source, dest)
+		assert.Exactly(t, want, dest)
 	})
 }

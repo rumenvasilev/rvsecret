@@ -9,25 +9,24 @@ import (
 
 	"github.com/google/go-github/github"
 	"github.com/rumenvasilev/rvsecret/internal/config"
-	"github.com/rumenvasilev/rvsecret/internal/core"
 	"github.com/rumenvasilev/rvsecret/internal/log"
+	"github.com/rumenvasilev/rvsecret/internal/session"
 	"github.com/rumenvasilev/rvsecret/internal/util"
 	whilp "github.com/whilp/git-urls"
 	"gopkg.in/yaml.v3"
 )
-
-// https://raw.githubusercontent.com/N0MoreSecr3ts/wraith-signatures/develop/signatures/default.yaml
 
 // signature version options
 // `latest` => last release in github
 // `current` => main branch latest commit
 // `semver` => specific version
 
-func Update(cfg *config.Config, log *log.Logger) error {
+func Update(cfg *config.Config) error {
+	log := log.Log
 	var dir string
 
 	// create session
-	sess, err := core.NewSessionWithConfig(cfg, log)
+	sess, err := session.NewWithConfig(cfg)
 	if err != nil {
 		return err
 	}
@@ -58,7 +57,7 @@ func Update(cfg *config.Config, log *log.Logger) error {
 	}
 
 	// install the signatures
-	if updateSignatures(dir, sess, log) {
+	if updateSignatures(dir, sess) {
 		log.Info("The signatures have been successfully updated at: %s", cfg.Signatures.Path)
 	} else {
 		return fmt.Errorf("the signatures were not updated")
@@ -87,7 +86,8 @@ func cleanInput(u string) (string, error) {
 }
 
 // updateSignatures will install the new signatures into the specified location, changing the name of the previous set
-func updateSignatures(rRepo string, sess *core.Session, log *log.Logger) bool {
+func updateSignatures(rRepo string, sess *session.Session) bool {
+	log := log.Log
 	// create a temp directory to hold the signatures we pull
 	// TODO put this in /tmp via a real library
 	tempSignaturesDir := rRepo + "/signatures"
@@ -110,7 +110,7 @@ func updateSignatures(rRepo string, sess *core.Session, log *log.Logger) bool {
 	// if we want to test the signatures before we install them
 	// TODO need to implement something here
 	if sess.Config.Signatures.Test {
-		if !executeTests(tempSignaturesDir, log) {
+		if !executeTests(tempSignaturesDir) {
 			log.Error("Signature tests have failed. Files are available for inspection in the temporary directory: %q", tempSignaturesDir)
 			return false
 		}
@@ -123,12 +123,13 @@ func updateSignatures(rRepo string, sess *core.Session, log *log.Logger) bool {
 		log.Error("The signature files are available for inspection in the temporary directory: %q", tempSignaturesDir)
 		return false
 	}
-	cleanUp(rRepo, log)
+	cleanUp(rRepo)
 	return true
 }
 
 // executeTests will run any tests associated with the expressions
-func executeTests(dir string, log *log.Logger) bool {
+func executeTests(dir string) bool {
+	log := log.Log
 	log.Debug("Running tests on acquired signature files...")
 	sigFiles, err := util.GetSignatureFiles(dir)
 	if err != nil {
@@ -137,20 +138,21 @@ func executeTests(dir string, log *log.Logger) bool {
 	}
 
 	// Run tests:
-	return isYaml(sigFiles, log)
+	return isYaml(sigFiles)
 }
 
 // cleanUp after ourselves and remove any temp garbage
-func cleanUp(path string, log *log.Logger) {
+func cleanUp(path string) {
 	if err := os.RemoveAll(path); err != nil {
-		log.Error(err.Error())
+		log.Log.Error(err.Error())
 	}
 }
 
 // runYamlTest would try to marshal the input file
 // if it can => true
 // if it cannot => false
-func isYaml(files []string, log *log.Logger) bool {
+func isYaml(files []string) bool {
+	log := log.Log
 	var tmp = make(map[string]interface{})
 	for _, v := range files {
 		// read file

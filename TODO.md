@@ -1,26 +1,16 @@
 # TODO
 ## Refactor
-- x Remove dependency on bindata - github.com/elazarl/go-bindata-assetfs
-- x Change banner
-- x Remove search for all github orgs if none is provided
 - Integrate with GHA for build/test
-  - x build,test pipeline
-  - x unit test, coverage (https://codecov.io/bash?), race
   - add release pipeline
   - Dynamic Changelog (in releases?)
 - Increase test coverage
 - Implement integration tests
-- x Refactor core package - remove multi-level nesting
 - Remove dependencies on Hashicorp as much as possible (viper?)
-- x Create config package
 - Remove global cfg var, explicitly pass it as arg
-- x os.Exit() everywhere, raise error instead
-- x replace pkg.Scan with interface for easier testing
 - Implement proper server wait, not select{}
 - Store md5 in session, avoiding duplicate calc
 - New Makefile
-- x Overhaul updateRules.go
-- x Start webserver everywhere
+- Propagate context
 
 ## Features
 - Add exit codes, so CI could detect if scan failed

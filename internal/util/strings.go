@@ -46,11 +46,15 @@ func CleanURLSpaces(dirtyStrings ...string) []string {
 // GenerateID will create an ID for each finding based up the SHA1 of discrete data points associated
 // with the finding.
 func GenerateID() string {
+	return GenerateIDWithLen(10000000000)
+}
+
+func GenerateIDWithLen(i int) string {
 	h := sha1.New()
 	source := rand.NewSource(time.Now().UnixNano())
 	randNum := rand.New(source)
 
-	_, err := io.WriteString(h, fmt.Sprintf("%x", randNum.Intn(10000000000)))
+	_, err := io.WriteString(h, fmt.Sprintf("%x", randNum.Intn(i)))
 
 	if err != nil {
 		fmt.Println("Not able to generate finding ID: ", err)

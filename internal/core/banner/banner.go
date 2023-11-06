@@ -12,7 +12,8 @@ import (
 //go:embed banner.txt
 var ASCIIBanner string
 
-func HeaderInfo(cfg config.Global, startTime string, sigs int, log *log.Logger) {
+func HeaderInfo(cfg config.Global, startTime string, sigs int) {
+	log := log.Log
 	if !cfg.JSONOutput && !cfg.CSVOutput {
 		log.Warn("%s", ASCIIBanner)
 		log.Important("%s v%s started at %s", version.Name, cfg.AppVersion, startTime)

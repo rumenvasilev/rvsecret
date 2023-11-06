@@ -7,14 +7,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/google/go-github/github"
-	"github.com/rumenvasilev/rvsecret/internal/core"
-	_github "github.com/rumenvasilev/rvsecret/internal/core/provider/github"
+	_github "github.com/google/go-github/github"
+	"github.com/rumenvasilev/rvsecret/internal/core/provider/github"
+	"github.com/rumenvasilev/rvsecret/internal/session"
 	"github.com/rumenvasilev/rvsecret/version"
 )
 
 // fetchSignaturesFromGithubAPI will only download a version of the signatures file from Github REST API
-func fetchSignaturesFromGithubAPI(version string, sess *core.Session) (string, error) {
+func fetchSignaturesFromGithubAPI(version string, sess *session.Session) (string, error) {
 	ctx := context.Background()
 	if sess.Config.Signatures.UserRepo == "" {
 		return "", fmt.Errorf("please provide -signatures-user-repo value")
@@ -27,12 +27,12 @@ func fetchSignaturesFromGithubAPI(version string, sess *core.Session) (string, e
 	owner := res[0]
 	repo := res[1]
 
-	client, err := _github.NewClient(sess.Config.Signatures.APIToken, "", sess.Out)
+	client, err := github.NewClient(sess.Config.Signatures.APIToken, "")
 	if err != nil {
 		return "", fmt.Errorf("failed instantiation of Github client, %w", err)
 	}
 
-	var assets *github.RepositoryRelease
+	var assets *_github.RepositoryRelease
 	if version == "latest" {
 		assets, err = client.GetLatestRelease(ctx, owner, repo)
 	} else {
@@ -51,7 +51,7 @@ func fetchSignaturesFromGithubAPI(version string, sess *core.Session) (string, e
 	return downloadAsset(assetURL, sess)
 }
 
-func getAssetURL(assets []github.ReleaseAsset) (string, error) {
+func getAssetURL(assets []_github.ReleaseAsset) (string, error) {
 	var download string
 	for _, v := range assets {
 		if v.GetName() == "default.yaml" {
@@ -65,7 +65,7 @@ func getAssetURL(assets []github.ReleaseAsset) (string, error) {
 	return download, nil
 }
 
-func downloadAsset(url string, sess *core.Session) (string, error) {
+func downloadAsset(url string, sess *session.Session) (string, error) {
 	// Create tmp dir
 	path, err := os.MkdirTemp("", "rvsecret")
 	if err != nil {
@@ -94,7 +94,7 @@ func downloadAsset(url string, sess *core.Session) (string, error) {
 	switch resp.StatusCode {
 	case 200:
 	default:
-		return "", &github.ErrorResponse{Response: resp}
+		return "", &_github.ErrorResponse{Response: resp}
 	}
 
 	// store file

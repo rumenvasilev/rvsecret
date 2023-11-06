@@ -186,6 +186,9 @@ github.com/pmezard/go-difflib/difflib
 github.com/rs/zerolog
 github.com/rs/zerolog/internal/cbor
 github.com/rs/zerolog/internal/json
+# github.com/rumenvasilev/go-gitlab-mock v0.0.1
+## explicit; go 1.21.0
+github.com/rumenvasilev/go-gitlab-mock/mock
 # github.com/sergi/go-diff v1.0.0
 ## explicit
 github.com/sergi/go-diff/diffmatchpatch
@@ -237,6 +240,7 @@ github.com/src-d/gcfg/types
 # github.com/stretchr/testify v1.8.3
 ## explicit; go 1.20
 github.com/stretchr/testify/assert
+github.com/stretchr/testify/require
 # github.com/subosito/gotenv v1.4.2
 ## explicit; go 1.18
 github.com/subosito/gotenv
@@ -265,7 +269,7 @@ github.com/ugorji/go/codec
 # github.com/whilp/git-urls v1.0.0
 ## explicit; go 1.13
 github.com/whilp/git-urls
-# github.com/xanzy/go-gitlab v0.90.0
+# github.com/xanzy/go-gitlab v0.93.2
 ## explicit; go 1.18
 github.com/xanzy/go-gitlab
 # github.com/xanzy/ssh-agent v0.2.1

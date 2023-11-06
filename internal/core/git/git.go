@@ -63,17 +63,10 @@ func GetChanges(commit *object.Commit, repo *git.Repository) (object.Changes, er
 // has no parents then it will create a dummy commit.
 func getParentCommit(commit *object.Commit, repo *git.Repository) (*object.Commit, error) {
 	if commit.NumParents() == 0 {
-		parentCommit, err := repo.CommitObject(plumbing.NewHash(EmptyTreeCommitID))
-		if err != nil {
-			return nil, err
-		}
-		return parentCommit, nil
+		return repo.CommitObject(plumbing.NewHash(EmptyTreeCommitID))
 	}
-	parentCommit, err := commit.Parents().Next()
-	if err != nil {
-		return nil, err
-	}
-	return parentCommit, nil
+
+	return commit.Parents().Next()
 }
 
 // GetChangeAction returns a more condensed and user friendly action for further reference
