@@ -6,6 +6,7 @@ import (
 
 	"github.com/rumenvasilev/rvsecret/internal/core"
 	"github.com/rumenvasilev/rvsecret/internal/core/provider"
+	"github.com/rumenvasilev/rvsecret/internal/core/provider/github"
 	"github.com/rumenvasilev/rvsecret/internal/session"
 	"gopkg.in/src-d/go-git.v4"
 	githttp "gopkg.in/src-d/go-git.v4/plumbing/transport/http"
@@ -29,16 +30,16 @@ func fetchSignaturesWithGit(version string, sess *session.Session) (string, erro
 	url := sess.Config.Signatures.URL
 	if sess.Config.Signatures.UserRepo != "" {
 		// TODO this address has to be a const perhaps?
-		url = fmt.Sprintf("https://github.com/%s", sess.Config.Signatures.UserRepo)
+		url = fmt.Sprintf("%s/%s", github.Address, sess.Config.Signatures.UserRepo)
 	}
 	// sanitize checks
-	cURL, err := cleanInput(url)
+	url, err = cleanInput(url)
 	if err != nil {
 		return "", err
 	}
 
 	cloneCfg := core.CloneConfiguration{
-		URL:        cURL,
+		URL:        url,
 		Branch:     branch,
 		Depth:      sess.Config.Global.CommitDepth,
 		InMemClone: sess.Config.Global.InMemClone,

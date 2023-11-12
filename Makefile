@@ -1,15 +1,7 @@
-#
-# Copyright (c) 2015, Matt Jones <urlugal@gmail.com>
-# All rights reserved.
-# MIT License
-# For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/MIT
-#
-# version 0.1.24
-#
- SHELL = /bin/bash
+SHELL = /bin/bash
 
-.PHONY: all build clean coverage help install package pretty test
-.DEFAULT_GOAL := help
+.PHONY: all build clean coverage lint test
+.DEFAULT_GOAL := lint
 
 # The name of the binary to build
 #
@@ -43,47 +35,31 @@ ifndef target_arch
 	target_arch = amd64
 endif
 
-## all		Run lint tools, clean and build
-all: pretty clean build
+## Lint, build
+all: pretty build
 
-## build		Download dependencies and build
-build: prep
+## Build
+build: clean
 	@GOOS=$(target_os) GOARCH=$(target_arch) go build -mod vendor -o ./bin/$(pkg)-$(target_os)
 
-## release		Download dependencies and build release binaries
-release: prep
-	@GOOS=$(target_os) GOARCH=$(target_arch) go build -mod vendor -ldflags="-s -w" -o ./bin/$(pkg)$(target_ext)
+linux:
+	@GOOS=linux GOARCH=$(target_arch) go build -mod vendor -o ./bin/$(pkg)-linux
 
-## clean		Clean binaries
+windows:
+	@GOOS=windows GOARCH=$(target_arch) go build -mod vendor -o ./bin/$(pkg)-windows.exe
+
+## Clean binaries
 clean:
 	@rm -rf ./bin
 
-## help		Print available make targets
-help:
-	@echo
-	@echo "Available make targets:"
-	@echo
-	@sed -ne '/@sed/!s/## /	/p' $(MAKEFILE_LIST)
-
-## install		Build and save binary in `$GOPATH/bin/`
-install: pretty
-	@GOOS=$(target_os) GOARCH=$(target_arch) go install
-
-## package		Run tests, clean and build binary
-package: test clean build
-
-# TODO set a flag to allow the updating of the packages at build time
-## prep		Install dependencies
-prep:
-	@go get
-
-## pretty		Run golint, go fmt and go vet
-pretty:
-	@golint ./...
+## Lint
+lint:
 	@go fmt ./...
-	@go vet ./...
+	@golangci-lint run
 
-## test		Run tests with coverage
-test: pretty
-	go test -mod vendor ./... -cover -race
+## Some tests depend on built binary, make sure you've built it beforehand.
+test:
+	@go test -v -mod vendor -race ./... 
 
+coverage:
+	@go test -mod vendor -coverprofile=coverage.out ./...

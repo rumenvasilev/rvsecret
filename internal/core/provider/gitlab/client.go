@@ -13,12 +13,14 @@ import (
 	"github.com/xanzy/go-gitlab"
 )
 
+const Address = "https://gitlab.com"
+
 // Client holds a gitlab api client instance
 type Client struct {
 	apiClient *gitlab.Client
 }
 
-// NewClient creates a gitlab api client instance using a token
+// NewClient creates a Gitlab API client instance
 func NewClient(token string) (*Client, error) {
 	err := validateAPIToken(token)
 	if err != nil {

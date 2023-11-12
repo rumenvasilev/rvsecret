@@ -5,8 +5,6 @@
   - Dynamic Changelog (in releases?)
 - Increase test coverage
 - Implement integration tests
-- Remove dependencies on Hashicorp as much as possible (viper?)
-- Remove global cfg var, explicitly pass it as arg
 - Implement proper server wait, not select{}
 - Store md5 in session, avoiding duplicate calc
 - New Makefile
@@ -14,7 +12,6 @@
 
 ## Features
 - Add exit codes, so CI could detect if scan failed
-- x Commit depth configurable
 - False/positive ignore file
 - Support for webserver when using localmode?
 - Add fingerprint `<commitid>:<file>:<rule/signature>:<line>`
@@ -23,6 +20,7 @@
   - eat our own dog food - rvsecret scans rvsecret
 - Build docker image
 - Add statistics for updated/downloaded signatures how many are found and how many are loaded - currently 60 out of 21+42(63)
+- Test signatures before importing
 
 ## Bugs
 - C++ generates false-positives (cisco/mlspp repository) --> should try with different signatures perhaps (like gitleaks?)

@@ -14,12 +14,17 @@ import (
 	"github.com/rumenvasilev/rvsecret/version"
 )
 
+const (
+	Address    = "https://github.com"
+	RAWAddress = "https://raw.githubusercontent.com"
+)
+
 // Client holds a github api client instance
 type Client struct {
 	apiClient *github.Client
 }
 
-// NewClient creates a gitlab api client instance using a token
+// NewClient creates a Github API client instance
 func NewClient(token, gheURL string) (*Client, error) {
 	err := validateAPIToken(token)
 	if err != nil {

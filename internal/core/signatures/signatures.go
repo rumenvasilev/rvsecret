@@ -113,7 +113,7 @@ func IsSafeText(sMatchString *string) bool {
 	return bResult
 }
 
-// confirmEntropy will determine correct entrophy of the string and decide if we move forward with the match
+// confirmEntropy will determine correct entropy of the string and decide if we move forward with the match
 func confirmEntropy(thisMatch string, iSessionEntropy float64) bool {
 	bResult := false
 

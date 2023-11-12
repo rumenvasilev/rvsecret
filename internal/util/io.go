@@ -9,10 +9,22 @@ import (
 	"regexp"
 	"strings"
 	"syscall"
+	"unicode/utf8"
 
 	"github.com/mitchellh/go-homedir"
 	cp "github.com/otiai10/copy"
 )
+
+var magicNumbers = [][]byte{
+	{0x1F, 0x8B, 0x08, 0x00},                         // GZip
+	{0x42, 0x5A, 0x68, 0x32},                         // BZip2
+	{0x50, 0x4B, 0x03, 0x04},                         // ZIP
+	{0x89, 0x50, 0x4E, 0x47},                         // PNG
+	{0x4D, 0x5A},                                     // Windows EXE
+	{0x7F, 'E', 'L', 'F'},                            // Linux ELF Executable
+	{0xFE, 0xED, 0xFA, 0xCE, 0xCE, 0xFA, 0xED, 0xFE}, // macOS Mach-O Binary
+	{0xFE, 0xED, 0xFA, 0xCF, 0x0C, 0x00, 0x00, 0x01}, // Mach-O 64-bit (x86_64)
+}
 
 // TODO THIS FUNC HAS TO RETURN ERROR, OTHERWISE WE DO THE SAME CHECK AGAIN LATER
 // PathExists will check if a path exists or not and is used to validate user input
@@ -208,4 +220,51 @@ func GetSignatureFiles(dir string) ([]string, error) {
 		}
 	}
 	return sigs, nil
+}
+
+func IsBinaryFile(filePath string) (bool, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+
+	// Read the first 4 bytes to identify file type
+	buffer := make([]byte, 4)
+	_, err = file.Read(buffer)
+	if err != nil {
+		return false, err
+	}
+
+	// Check for common binary file magic numbers
+	for _, magic := range magicNumbers {
+		if bytesMatch(buffer, magic) {
+			return true, nil
+		}
+	}
+
+	// The implementation above doesn't catch all binaries, one example being go compiled
+	// binaries for darwin (macos), but unicode test does.
+	// https://groups.google.com/g/golang-nuts/c/YeLL7L7SwWs/m/LGlsc9GIJlUJ
+	// if the encoding is invalid, it returns (RuneError, 1)
+	runerr, p := utf8.DecodeRune(buffer)
+	if runerr == utf8.RuneError {
+		if p == 0 || p == 1 {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func bytesMatch(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
 }

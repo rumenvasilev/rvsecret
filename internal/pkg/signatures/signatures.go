@@ -1,14 +1,12 @@
 package signatures
 
 import (
-	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"regexp"
 
-	"github.com/google/go-github/github"
 	"github.com/rumenvasilev/rvsecret/internal/config"
+	"github.com/rumenvasilev/rvsecret/internal/core/provider/github"
 	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/internal/session"
 	"github.com/rumenvasilev/rvsecret/internal/util"
@@ -45,7 +43,7 @@ func Update(cfg *config.Config) error {
 	// try from Github REST API first
 	dir, err = fetchSignaturesFromGithubAPI(cfg.Signatures.Version, sess)
 	if err != nil {
-		if isCredentialsError(err) {
+		if github.IsCredentialsError(err) {
 			log.Debug(err.Error())
 			return fmt.Errorf("github token is not authorized, please update its permissions or generate a new one")
 		}
@@ -63,17 +61,6 @@ func Update(cfg *config.Config) error {
 		return fmt.Errorf("the signatures were not updated")
 	}
 	return nil
-}
-
-func isCredentialsError(err error) bool {
-	var gherr *github.ErrorResponse
-	if errors.As(err, &gherr) {
-		if gherr.Response.StatusCode == http.StatusUnauthorized {
-			// log.Debug(err.Error())
-			return true
-		}
-	}
-	return false
 }
 
 // cleanInput will ensure that any user supplied git url is in the proper format
@@ -95,20 +82,20 @@ func updateSignatures(rRepo string, sess *session.Session) bool {
 	// ensure we have the proper home directory
 	home, err := util.SetHomeDir(sess.Config.Signatures.Path)
 	if err != nil {
-		// TODO-RV: Do something more?
-		log.Error(err.Error())
+		log.Error("failed setting the home directory for signatures to %q, error %s", sess.Config.Signatures.Path, err.Error())
+		return false
 	}
 
 	// if the signatures path does not exist then we create it
 	if !util.PathExists(home) {
 		err := os.MkdirAll(home, 0700)
 		if err != nil {
-			log.Error(err.Error())
+			log.Error("couldn't create directory for signatures %q", home, err.Error())
+			return false
 		}
 	}
 
 	// if we want to test the signatures before we install them
-	// TODO need to implement something here
 	if sess.Config.Signatures.Test {
 		if !executeTests(tempSignaturesDir) {
 			log.Error("Signature tests have failed. Files are available for inspection in the temporary directory: %q", tempSignaturesDir)

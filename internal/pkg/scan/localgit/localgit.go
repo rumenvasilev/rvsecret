@@ -1,6 +1,7 @@
 package localgit
 
 import (
+	"context"
 	"time"
 
 	"github.com/rumenvasilev/rvsecret/internal/config"
@@ -20,6 +21,7 @@ type LocalGit struct {
 func (l LocalGit) Run() error {
 	cfg := l.Cfg
 	log := log.Log
+	ctx := context.Background()
 	// create session
 	sess, err := session.NewWithConfig(cfg)
 	if err != nil {
@@ -28,7 +30,7 @@ func (l LocalGit) Run() error {
 
 	// Start webserver
 	if cfg.Global.WebServer && !cfg.Global.Silent {
-		ws := webserver.New(*cfg, sess.State)
+		ws := webserver.New(ctx, *cfg, sess.State)
 		go ws.Start()
 	}
 
@@ -46,7 +48,7 @@ func (l LocalGit) Run() error {
 	if err != nil {
 		return err
 	}
-	core.AnalyzeRepositories(sess, sess.State.Stats)
+	core.AnalyzeRepositories(ctx, sess, sess.State.Stats)
 	sess.Finish()
 
 	err = output.Summary(sess.State, sess.Config.Global, sess.SignatureVersion)

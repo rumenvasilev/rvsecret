@@ -41,11 +41,12 @@ func retrieveReposWorker(ctx context.Context, workerID int, wg *sync.WaitGroup, 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Info("Job cancellation requested.")
+			log.Info("[THREAD #%d] Job cancellation requested.", workerID)
 			wg.Done()
 			return
 		case target, ok := <-ch:
 			if !ok {
+				log.Debug("[THREAD #%d]: No more targets to retrieve", workerID)
 				wg.Done()
 				return
 			}

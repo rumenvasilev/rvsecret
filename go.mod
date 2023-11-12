@@ -1,6 +1,6 @@
 module github.com/rumenvasilev/rvsecret
 
-go 1.21.0
+go 1.21.4
 
 require (
 	github.com/fatih/color v1.15.0
@@ -20,7 +20,7 @@ require (
 	github.com/whilp/git-urls v1.0.0
 	github.com/xanzy/go-gitlab v0.93.2
 	golang.org/x/oauth2 v0.11.0
-	golang.org/x/sync v0.3.0
+	golang.org/x/sync v0.5.0
 	gopkg.in/src-d/go-git.v4 v4.13.1
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -74,10 +74,10 @@ require (
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	github.com/xanzy/ssh-agent v0.2.1 // indirect
 	golang.org/x/arch v0.4.0 // indirect
-	golang.org/x/crypto v0.12.0 // indirect
-	golang.org/x/net v0.14.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
-	golang.org/x/text v0.12.0 // indirect
+	golang.org/x/crypto v0.15.0 // indirect
+	golang.org/x/net v0.18.0 // indirect
+	golang.org/x/sys v0.14.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect

@@ -1,9 +1,12 @@
 package localpath
 
 import (
+	"context"
 	"time"
 
 	"github.com/rumenvasilev/rvsecret/internal/config"
+	"github.com/rumenvasilev/rvsecret/internal/core"
+	coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
 	"github.com/rumenvasilev/rvsecret/internal/core/banner"
 	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/internal/output"
@@ -20,6 +23,7 @@ type Localpath struct {
 func (l Localpath) Run() error {
 	cfg := l.Cfg
 	log := log.Log
+	ctx := context.Background()
 	// exclude the .git directory from local scans as it is not handled properly here
 	cfg.Global.SkippablePath = util.AppendIfMissing(cfg.Global.SkippablePath, ".git/")
 
@@ -31,7 +35,7 @@ func (l Localpath) Run() error {
 
 	// Start webserver
 	if cfg.Global.WebServer && !cfg.Global.Silent {
-		ws := webserver.New(*cfg, sess.State)
+		ws := webserver.New(ctx, *cfg, sess.State)
 		go ws.Start()
 	}
 
@@ -44,14 +48,14 @@ func (l Localpath) Run() error {
 	// By default we display a header to the user giving basic info about application. This will not be displayed
 	// during a silent run which is the default when using this in an automated fashion.
 	banner.HeaderInfo(cfg.Global, sess.State.Stats.StartedAt.Format(time.RFC3339), len(sess.Signatures))
-
+	ctxworker := context.WithValue(ctx, core.TID, 0)
 	for _, p := range cfg.Local.Paths {
 		if util.PathExists(p) {
 			last := p[len(p)-1:]
 			if last == "/" {
 				scanDir(p, sess)
 			} else {
-				doFileScan(p, sess)
+				core.AnalyzeObject(ctxworker, sess, nil, nil, p, coreapi.Repository{})
 			}
 		}
 	}

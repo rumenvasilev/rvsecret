@@ -6,14 +6,11 @@ import (
 	"strings"
 
 	"github.com/rumenvasilev/rvsecret/internal/config"
+	"github.com/rumenvasilev/rvsecret/internal/core/provider/github"
+	"github.com/rumenvasilev/rvsecret/internal/core/provider/gitlab"
 	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/rumenvasilev/rvsecret/internal/util"
-)
-
-const (
-	githubURL string = "https://github.com"
-	gitlabURL string = "https://gitlab.com"
 )
 
 // Finding is a secret that has been discovered within a target by a discovery method
@@ -52,7 +49,7 @@ func (f *Finding) setupUrls(scanType api.ScanType, gheURL string) {
 	var baseURL string
 	switch scanType {
 	case api.Github, api.GithubEnterprise:
-		baseURL = githubURL
+		baseURL = github.Address
 		if scanType == api.GithubEnterprise {
 			baseURL = gheURL
 		}
@@ -60,7 +57,7 @@ func (f *Finding) setupUrls(scanType api.ScanType, gheURL string) {
 		f.FileURL = fmt.Sprintf("%s/blob/%s/%s", f.RepositoryURL, f.CommitHash, f.FilePath)
 		f.CommitURL = fmt.Sprintf("%s/commit/%s", f.RepositoryURL, f.CommitHash)
 	case api.Gitlab:
-		baseURL = gitlabURL
+		baseURL = gitlab.Address
 		results := util.CleanURLSpaces(f.RepositoryOwner, f.RepositoryName)
 		f.RepositoryURL = fmt.Sprintf("%s/%s/%s", baseURL, results[0], results[1])
 		f.FileURL = fmt.Sprintf("%s/blob/%s/%s", f.RepositoryURL, f.CommitHash, f.FilePath)

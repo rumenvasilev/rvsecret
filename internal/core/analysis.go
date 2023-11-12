@@ -2,6 +2,8 @@
 package core
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -20,13 +22,17 @@ import (
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 )
 
+type threadID int
+
+const TID threadID = 0
+
 // AnalyzeRepositories will clone the repos, grab their history for analysis of files and content.
 //
 //	Before the analysis is done we also check various conditions that can be thought of as filters and
 //	are controlled by flags. If a directory, file, or the content pass through all of the filters then
 //	it is scanned once per each signature which may lead to a specific secret matching multiple rules
 //	and then generating multiple findings.
-func AnalyzeRepositories(sess *session.Session, st *stats.Stats) {
+func AnalyzeRepositories(ctx context.Context, sess *session.Session, st *stats.Stats) {
 	log := log.Log
 	st.UpdateStatus(stats.StatusAnalyzing)
 	repoCnt := len(sess.State.Repositories)
@@ -54,7 +60,7 @@ func AnalyzeRepositories(sess *session.Session, st *stats.Stats) {
 
 	// Start analyzer workers
 	for i := 0; i < threadNum; i++ {
-		go analyzeWorker(i, ch, &wg, sess, st)
+		go analyzeWorker(ctx, i, &wg, ch, sess, st)
 	}
 
 	// Feed repos to the analyzer workers
@@ -68,36 +74,37 @@ func AnalyzeRepositories(sess *session.Session, st *stats.Stats) {
 	wg.Wait()
 }
 
-func analyzeWorker(tid int, ch chan coreapi.Repository, wg *sync.WaitGroup, sess *session.Session, st *stats.Stats) {
+func analyzeWorker(ctx context.Context, workerID int, wg *sync.WaitGroup, ch chan coreapi.Repository, sess *session.Session, st *stats.Stats) {
 	log := log.Log
+	ctxworker := context.WithValue(ctx, TID, workerID)
 	for {
-		log.Debug("[THREAD #%d] Requesting new repository to analyze...", tid)
-		repo, ok := <-ch
-		if !ok {
-			log.Debug("[THREAD #%d] No more tasks, marking WaitGroup done", tid)
+		select {
+		case <-ctx.Done():
+			log.Info("[THREAD #%d] Job cancellation requested.", workerID)
 			wg.Done()
 			return
-		}
+		case repo, ok := <-ch:
+			log.Debug("[THREAD #%d] Requesting new repository to analyze...", workerID)
+			if !ok {
+				wg.Done()
+				return
+			}
 
-		// Clone the repository from the remote source or if a local repo from the path
-		// The path variable is returning the path that the clone was done to. The repo is cloned directly
-		// there.
-		log.Debug("[THREAD #%d][%s] Cloning repository...", tid, repo.CloneURL)
-		clone, path, err := cloneRepository(sess.Config, st.IncrementRepositoriesCloned, repo)
-		if err != nil {
-			log.Error("%v", err)
+			// Clone the repository from the remote source or if a local repo from the path
+			// The path variable is returning the path that the clone was done to. The repo is cloned directly
+			// there.
+			log.Debug("[THREAD #%d][%s] Cloning repository...", workerID, repo.CloneURL)
+			clone, path, err := cloneRepository(sess.Config, st.IncrementRepositoriesCloned, repo)
+			if err != nil {
+				log.Error("%v", err)
+				cleanUpPath(path)
+				continue
+			}
+
+			analyzeHistory(ctxworker, sess, clone, path, repo)
 			cleanUpPath(path)
-			continue
+			st.IncrementRepositoriesScanned()
 		}
-		log.Debug("[THREAD #%d][%s] Cloned repository to: %s", tid, repo.CloneURL, path)
-
-		analyzeHistory(sess, clone, tid, path, repo)
-
-		log.Debug("[THREAD #%d][%s] Done analyzing commits", tid, repo.CloneURL)
-		log.Debug("[THREAD #%d][%s] Deleted %s", tid, repo.CloneURL, path)
-
-		cleanUpPath(path)
-		st.IncrementRepositoriesScanned()
 	}
 }
 
@@ -108,10 +115,10 @@ func cleanUpPath(path string) {
 	}
 }
 
-func analyzeHistory(sess *session.Session, clone *_git.Repository, tid int, path string, repo coreapi.Repository) {
+func analyzeHistory(ctx context.Context, sess *session.Session, clone *_git.Repository, path string, repo coreapi.Repository) {
 	stats := sess.State.Stats
 	log := log.Log
-
+	tid := ctx.Value(TID)
 	// Get the full commit history for the repo
 	history, err := git.GetRepositoryHistory(clone)
 	if err != nil {
@@ -140,7 +147,7 @@ func analyzeHistory(sess *session.Session, clone *_git.Repository, tid int, path
 		// it is found.
 		stats.IncrementCommitsScanned()
 
-		if yes := isDirtyCommit(sess, commit, repo, clone, path, tid); yes {
+		if yes := isDirtyCommit(ctx, sess, commit, repo, clone, path); yes {
 			// Increment the number of commits that were found to be dirty
 			stats.IncrementCommitsDirty()
 		}
@@ -148,10 +155,10 @@ func analyzeHistory(sess *session.Session, clone *_git.Repository, tid int, path
 }
 
 // isDirtyCommit will analyze all the changes and return bool if there's a dirty commit
-func isDirtyCommit(sess *session.Session, commit *object.Commit, repo coreapi.Repository, clone *_git.Repository, path string, tid int) bool {
-	stats := sess.State.Stats
+func isDirtyCommit(ctx context.Context, sess *session.Session, commit *object.Commit, repo coreapi.Repository, clone *_git.Repository, path string) bool {
+	// stats := sess.State.Stats
 	log := log.Log
-
+	tid := ctx.Value(TID)
 	// This will be used to increment the dirty commit stat if any matches are found. A dirty commit
 	// means that a secret was found in that commit. This provides an easier way to manually to look
 	// through the commit history of a given repo.
@@ -161,79 +168,89 @@ func isDirtyCommit(sess *session.Session, commit *object.Commit, repo coreapi.Re
 	log.Debug("[THREAD #%d][%s] %d changes in %s", tid, repo.CloneURL, len(changes), commit.Hash)
 
 	for _, change := range changes {
-		// The total number of files that were evaluated
-		stats.IncrementFilesTotal()
-
-		// TODO Is this need for the finding object, why are we saving this?
-		changeAction := git.GetChangeAction(change)
-
-		// TODO Add an example of the output from this function
-		fPath := git.GetChangePath(change)
-
-		// TODO Add an example of this
-		fullFilePath := path + "/" + fPath
-
-		// Break a file name up into its composite pieces including the extension and base name
-		mf := matchfile.New(fullFilePath)
-
-		// Check if file has to be ignored
-		if ok, msg := ignoredFile(sess.Config.Global.ScanTests, sess.Config.Global.MaxFileSize, fullFilePath, mf, sess.Config.Global.SkippableExt, sess.Config.Global.SkippablePath); ok {
-			log.Debug("[THREAD #%d][%s] %s %s", tid, repo.CloneURL, fPath, msg)
-			stats.IncrementIgnoredFiles()
-			continue
-		}
-
-		// We are now finally at the point where we are going to scan a file so we implement
-		// that count.
-		stats.IncrementScannedFiles()
-
-		// We set this to a default of false and will be used at the end of matching to
-		// increment the file count. If we try and do this in the loop it will hit for every
-		// signature and give us a false count.
-		// dirtyFile := false
-
-		// call signaturesfunc
-		dirtyFile, dcommit, ignored, out := signatures.Discover(mf, change, sess.Config, sess.Signatures)
-		for _, v := range out {
-			fin := &finding.Finding{
-				Action:           changeAction,
-				Content:          v.Content,
-				CommitAuthor:     commit.Author.String(),
-				CommitHash:       commit.Hash.String(),
-				CommitMessage:    strings.TrimSpace(commit.Message),
-				Description:      v.Sig.Description(),
-				FilePath:         fPath,
-				AppVersion:       sess.Config.Global.AppVersion,
-				LineNumber:       strconv.Itoa(v.LineNum),
-				RepositoryName:   repo.Name,
-				RepositoryOwner:  repo.Owner,
-				SignatureID:      v.Sig.SignatureID(),
-				SignatureVersion: sess.SignatureVersion,
-				SecretID:         util.GenerateID(),
-			}
-			_ = fin.Initialize(sess.Config.Global.ScanType, sess.Config.Github.GithubEnterpriseURL)
-			// Add it to the session
-			sess.State.AddFinding(fin)
-			log.Debug("[THREAD #%d][%s] Done analyzing changes in %s", tid, repo.CloneURL, commit.Hash)
-
-			// Print realtime data to stdout
-			fin.RealtimeOutput(sess.Config.Global)
-		}
-
-		if dirtyFile {
-			stats.IncrementDirtyFiles()
-		}
-		if dcommit {
-			dirtyCommit = dcommit
-		}
-		if ignored > 0 {
-			stats.IncrementIgnoredFilesWith(ignored)
+		if AnalyzeObject(ctx, sess, change, commit, path, repo) {
+			dirtyCommit = true
 		}
 	}
 	return dirtyCommit
 }
 
-func ignoredFile(cfgScanTests bool, cfgMaxFileSize int64, fullFilePath string, mf matchfile.MatchFile, cfgSkippableExt, cfgSkippablePath []string) (bool, string) {
+func AnalyzeObject(ctx context.Context, sess *session.Session, change *object.Change, commit *object.Commit, filepath string, repo coreapi.Repository) bool {
+	log := log.Log
+	tid := ctx.Value(TID)
+	cfg := sess.Config
+	fPath := filepath
+
+	// The total number of files that were evaluated
+	sess.State.Stats.IncrementFilesTotal()
+
+	var changeAction string
+	if change != nil {
+		changeAction = git.GetChangeAction(change)
+		fPath = git.GetChangePath(change)
+		filepath += fmt.Sprintf("/%s", fPath)
+	}
+
+	// Break a file name up into its composite pieces including the extension and base name
+	mf := matchfile.New(filepath)
+
+	// Check if file has to be ignored
+	if ok, msg := isIgnoredFile(cfg.Global.ScanTests, cfg.Global.MaxFileSize, filepath, mf, cfg.Global.SkippableExt, cfg.Global.SkippablePath); ok {
+		if change != nil {
+			log.Debug("[THREAD #%d][%s] %s %s", tid, repo.CloneURL, fPath, msg)
+		} else {
+			log.Debug("[THREAD #%d] %s %s", tid, fPath, msg)
+		}
+		sess.State.Stats.IncrementIgnoredFiles()
+		return false
+	}
+
+	// We are now finally at the point where we are going to scan a file so we implement
+	// that count.
+	sess.State.Stats.IncrementScannedFiles()
+
+	dirtyFile, dcommit, ignored, results := signatures.Discover(mf, change, cfg, sess.Signatures)
+
+	// Create template finding, so we won't need to pass all the parameters to the generateFindings func
+	tpl := finding.Finding{
+		Action:           changeAction,
+		FilePath:         fPath,
+		AppVersion:       sess.Config.Global.AppVersion,
+		RepositoryName:   ``, // TODO do we need to set these 2 lines to nothing?
+		RepositoryOwner:  ``,
+		SignatureVersion: sess.SignatureVersion,
+	}
+	if commit != nil {
+		tpl.CommitAuthor = commit.Author.String()
+		tpl.CommitHash = commit.Hash.String()
+		tpl.CommitMessage = strings.TrimSpace(commit.Message)
+	}
+	if repo != (coreapi.Repository{}) {
+		tpl.RepositoryName = repo.Name
+		tpl.RepositoryOwner = repo.Owner
+	}
+	for _, v := range results {
+		generateFindings(sess, v, tpl)
+	}
+
+	if dirtyFile {
+		sess.State.Stats.IncrementDirtyFiles()
+	}
+
+	if ignored > 0 {
+		sess.State.Stats.IncrementIgnoredFilesWith(ignored)
+	}
+
+	return dcommit
+}
+
+func isIgnoredFile(cfgScanTests bool, cfgMaxFileSize int64, fullFilePath string, mf matchfile.MatchFile, cfgSkippableExt, cfgSkippablePath []string) (bool, string) {
+	// Check if file exist before moving on
+	_, err := os.Stat(fullFilePath)
+	if err != nil {
+		return true, "file does not exist"
+	}
+
 	// required as that is a map of interfaces.
 	// scanTests := DefaultValues["scan-tests"]
 	likelyTestFile := cfgScanTests
@@ -260,8 +277,31 @@ func ignoredFile(cfgScanTests bool, cfgMaxFileSize int64, fullFilePath string, m
 		return true, msg
 	}
 
+	// Check if it is a binary file
+	yes, err = util.IsBinaryFile(fullFilePath)
+	if yes || err != nil {
+		return true, "is a binary file, ignoring"
+	}
+
 	if mf.IsSkippable(cfgSkippableExt, cfgSkippablePath) {
-		return true, "is skippable and is being ignored"
+		return true, "is skippable, ignoring"
 	}
 	return false, ""
+}
+
+func generateFindings(sess *session.Session, data signatures.DiscoverOutput, template finding.Finding) {
+	fin := template
+	fin.Content = data.Content
+	fin.Description = data.Sig.Description()
+	fin.LineNumber = strconv.Itoa(data.LineNum)
+	fin.SignatureID = data.Sig.SignatureID()
+	fin.SecretID = util.GenerateID()
+
+	_ = fin.Initialize(sess.Config.Global.ScanType, sess.Config.Github.GithubEnterpriseURL)
+
+	// Add it to the session
+	sess.State.AddFinding(&fin)
+
+	// Print realtime data to stdout
+	fin.RealtimeOutput(sess.Config.Global)
 }

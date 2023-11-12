@@ -110,8 +110,7 @@ func (s *Stats) IncrementFindings() {
 
 // UpdateProgress will update the progress percentage
 func (s *Stats) updateProgress(current int, total int) {
-	//s.Lock() TODO REMOVE ME
-	//defer s.Unlock() TODO REMOVE ME
+	// This is a child method, so lock is already acquired.
 	progress := 100.0
 	if current < total {
 		progress = (float64(current) * float64(100)) / float64(total)

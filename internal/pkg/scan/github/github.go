@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -40,7 +41,7 @@ func (g Github) Run() error {
 
 	// Start webserver
 	if cfg.Global.WebServer && !cfg.Global.Silent {
-		ws := webserver.New(*cfg, sess.State)
+		ws := webserver.New(ctx, *cfg, sess.State)
 		go ws.Start()
 	}
 
@@ -48,10 +49,7 @@ func (g Github) Run() error {
 	// during a silent run which is the default when using this in an automated fashion.
 	banner.HeaderInfo(cfg.Global, sess.State.Stats.StartedAt.Format(time.RFC3339), len(sess.Signatures))
 
-	if cfg.Global.Debug {
-		log.Debug(config.PrintDebug(sess.SignatureVersion))
-	}
-
+	log.Debug(config.PrintDebug(sess.SignatureVersion))
 	log.Debug("We have these orgs: %s", sess.GithubUserOrgs)
 	log.Debug("We have these users: %s", sess.GithubUserLogins)
 	log.Debug("We have these repos: %s", sess.GithubUserRepos)
@@ -78,7 +76,7 @@ func (g Github) Run() error {
 	default:
 		// Catchall for not being able to scan any as either we have no information or
 		// we don't have the rights kinds of information
-		return fmt.Errorf("please specify an org or user that contains the repo(s)")
+		return errors.New("please specify an org or user that contains the repo(s)")
 	}
 
 	if len(sess.State.Targets) == 0 && err != nil {
@@ -86,7 +84,7 @@ func (g Github) Run() error {
 	}
 
 	core.GatherRepositories(ctx, sess)
-	core.AnalyzeRepositories(sess, sess.State.Stats)
+	core.AnalyzeRepositories(ctx, sess, sess.State.Stats)
 	sess.Finish()
 
 	err = output.Summary(sess.State, sess.Config.Global, sess.SignatureVersion)

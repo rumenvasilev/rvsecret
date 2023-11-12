@@ -45,7 +45,6 @@ func (f *Finding) toCSV() []string {
 	}
 }
 
-// TODO move this to finding package
 func WriteCSV(findings []*Finding) error {
 	w := csv.NewWriter(os.Stdout)
 	defer w.Flush()

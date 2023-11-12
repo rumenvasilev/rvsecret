@@ -31,7 +31,7 @@ func (g Gitlab) Run() error {
 
 	// Start webserver
 	if cfg.Global.WebServer && !cfg.Global.Silent {
-		ws := webserver.New(*cfg, sess.State)
+		ws := webserver.New(ctx, *cfg, sess.State)
 		go ws.Start()
 	}
 
@@ -46,7 +46,7 @@ func (g Gitlab) Run() error {
 
 	core.GatherTargets(sess)
 	core.GatherRepositories(ctx, sess)
-	core.AnalyzeRepositories(sess, sess.State.Stats)
+	core.AnalyzeRepositories(ctx, sess, sess.State.Stats)
 	sess.Finish()
 
 	err = output.Summary(sess.State, sess.Config.Global, sess.SignatureVersion)

@@ -29,28 +29,20 @@ jobs:
         run: go version
 
       - name: Build
-        run: go build -mod vendor -v ./...
+        run: make build
       
       - name: Lint
         uses: golangci/golangci-lint-action@3a919529898de77ec3da873e3063ca4b10e7f5cc #v3
         with:
-          version: v1.54
+          version: v1.55.2
 
       - name: Test
-        run: go test -mod vendor -race -v ./...
+        run: make test
   
       - name: Create coverage report
-        run: go test -mod vendor -coverprofile=coverage.out -v ./...
+        run: make coverage
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d #v3
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-      # - name: Run GoKart
-      #   uses: kitabisa/gokart-action@v1.0.0
-      #   with:
-      #     globalsTainted: true
-
-      # - name: Upload GoKart results
-      #   uses: github/codeql-action/upload-sarif@v1

@@ -1,6 +1,7 @@
 package webserver
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -14,6 +15,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rumenvasilev/rvsecret/assets"
 	"github.com/rumenvasilev/rvsecret/internal/config"
+	"github.com/rumenvasilev/rvsecret/internal/core/provider/github"
+	"github.com/rumenvasilev/rvsecret/internal/core/provider/gitlab"
 	"github.com/rumenvasilev/rvsecret/internal/log"
 	"github.com/rumenvasilev/rvsecret/internal/pkg/scan/api"
 	"github.com/rumenvasilev/rvsecret/internal/session"
@@ -22,9 +25,9 @@ import (
 
 // Set various internal values used by the web interface
 const (
-	GithubBaseURI   = "https://raw.githubusercontent.com"
+	GithubBaseURI   = github.RAWAddress
 	MaximumFileSize = 153600
-	GitLabBaseURL   = "https://gitlab.com"
+	GitLabBaseURL   = gitlab.Address
 	CspPolicy       = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'"
 	ReferrerPolicy  = "no-referrer"
 	local           = "add/path/here"
@@ -46,7 +49,7 @@ type Engine struct {
 }
 
 // New will create an instance of the web frontend, setting the necessary parameters.
-func New(cfg config.Config, state *session.State) *Engine {
+func New(ctx context.Context, cfg config.Config, state *session.State) *Engine {
 	log := log.Log
 	gin.SetMode(gin.ReleaseMode)
 	if cfg.Global.Debug {
