@@ -1,0 +1,4 @@
+--
+#this file is expected to be ignored
+root:
+  child: bla

@@ -80,19 +80,11 @@ func updateSignatures(rRepo string, sess *session.Session) bool {
 	tempSignaturesDir := rRepo + "/signatures"
 
 	// ensure we have the proper home directory
-	home, err := util.SetHomeDir(sess.Config.Signatures.Path)
-	if err != nil {
-		log.Error("failed setting the home directory for signatures to %q, error %s", sess.Config.Signatures.Path, err.Error())
-		return false
-	}
-
 	// if the signatures path does not exist then we create it
-	if !util.PathExists(home) {
-		err := os.MkdirAll(home, 0700)
-		if err != nil {
-			log.Error("couldn't create directory for signatures %q", home, err.Error())
-			return false
-		}
+	home, err := util.MakeHomeDir(sess.Config.Signatures.Path)
+	if err != nil {
+		log.Error("couldn't create signatures directory %q, error %s", sess.Config.Signatures.Path, err.Error())
+		return false
 	}
 
 	// if we want to test the signatures before we install them
@@ -118,7 +110,7 @@ func updateSignatures(rRepo string, sess *session.Session) bool {
 func executeTests(dir string) bool {
 	log := log.Log
 	log.Debug("Running tests on acquired signature files...")
-	sigFiles, err := util.GetSignatureFiles(dir)
+	sigFiles, err := util.GetYamlFiles(dir)
 	if err != nil {
 		log.Error("Failed to get signature files from target path %q, error: %q", dir, err.Error())
 		return false

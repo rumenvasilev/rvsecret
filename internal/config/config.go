@@ -142,7 +142,7 @@ func SetConfig(cmd *cobra.Command) {
 	cf := viper.GetString("global.config-file")
 	noconfig := false
 	if cf != "" && cf != configFile {
-		if util.FileExists(cf) {
+		if util.PathExists(cf) {
 			viper.SetConfigFile(cf)
 		} else {
 			noconfig = true

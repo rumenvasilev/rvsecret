@@ -15,74 +15,28 @@ import (
 	cp "github.com/otiai10/copy"
 )
 
-var magicNumbers = [][]byte{
-	{0x1F, 0x8B, 0x08, 0x00},                         // GZip
-	{0x42, 0x5A, 0x68, 0x32},                         // BZip2
-	{0x50, 0x4B, 0x03, 0x04},                         // ZIP
-	{0x89, 0x50, 0x4E, 0x47},                         // PNG
-	{0x4D, 0x5A},                                     // Windows EXE
-	{0x7F, 'E', 'L', 'F'},                            // Linux ELF Executable
-	{0xFE, 0xED, 0xFA, 0xCE, 0xCE, 0xFA, 0xED, 0xFE}, // macOS Mach-O Binary
-	{0xFE, 0xED, 0xFA, 0xCF, 0x0C, 0x00, 0x00, 0x01}, // Mach-O 64-bit (x86_64)
-}
-
 // TODO THIS FUNC HAS TO RETURN ERROR, OTHERWISE WE DO THE SAME CHECK AGAIN LATER
 // PathExists will check if a path exists or not and is used to validate user input
 func PathExists(path string) bool {
 	_, err := os.Stat(path)
-	if e, ok := err.(*os.PathError); ok && e.Err == syscall.ENOSPC {
-		return false
-	}
-
-	if err == nil {
-		return true
-	}
-
-	if os.IsNotExist(err) {
-		// logger.Debug("Path does not exist: %s", err.Error())
-		return false
-	}
-
-	return true
-}
-
-// FileExists will check for the existence of a file and return a bool depending
-// on if it exists in a given path or not.
-func FileExists(path string) bool {
-	_, err := os.Stat(path)
 	if err != nil {
-		// File does not exist?
-		return !errors.Is(err, fs.ErrNotExist)
+		if errors.Is(err, fs.ErrNotExist) {
+			return false
+		}
+
+		var e *os.PathError
+		if errors.As(err, &e) {
+			return e.Err == syscall.ENOSPC
+		}
 	}
+
 	return true
-}
-
-// SetHomeDir will set the correct homedir.
-func SetHomeDir(h string) (string, error) {
-	if strings.Contains(h, "$HOME") {
-		home, err := homedir.Dir()
-		if err != nil {
-			return "", err
-		}
-
-		h = strings.Replace(h, "$HOME", home, -1)
-	}
-
-	if strings.Contains(h, "~") {
-		home, err := homedir.Dir()
-		if err != nil {
-			return "", err
-		}
-		h = strings.Replace(h, "~", home, -1)
-	}
-	return h, nil
 }
 
 // IsMaxFileSize will determine if the file size is under the max limit set by maxFileSize
 func IsMaxFileSize(filename string, maxFileSize int64) (bool, string) {
 
 	fi, err := os.Stat(filename)
-
 	// This error occurs when the file is not found.
 	// The source of truth for files traversed comes from:
 	// 		git - the commit history (or)
@@ -93,65 +47,65 @@ func IsMaxFileSize(filename string, maxFileSize int64) (bool, string) {
 	//
 	// In the case of git, it can be assumed that the file will exist somewhere in the commit history.
 	// Thereforce, we assume that the file size is within the limit and return false.
-	if _, ok := err.(*os.PathError); ok {
-		return false, "does not exist"
+	if err != nil {
+		return false, err.Error()
 	}
 
-	fileSize := fi.Size()
 	mfs := maxFileSize * 1024 * 1024
-
-	if fileSize > mfs {
+	if fi.Size() > mfs {
 		return true, "is too large"
 	}
+
 	return false, ""
 }
 
+var (
+	testPathRegex = []string{
+		// If the directory contains "test"
+		// Ex. foo/test/bar
+		`(?i)[/\\]test?[/\\]`,
+		// If the directory starts with test, the leading slash gets dropped by default
+		// Ex. test/foo/bar
+		`(?i)test?[/\\]`,
+		// If the directory path starts with a different root but has the word test in it somewhere
+		// Ex. foo/test-secrets/bar
+		`/test.*/`,
+	}
+	testFileRegex = []string{
+		// A the word Test is in the string, case sensitive
+		// Ex. ghTestlk
+		// Ex. Testllfhe
+		// Ex. Test
+		`Test`,
+		// A file has a suffix of _test
+		// Golang uses this as the default test file naming convention
+		//Ex. foo_test.go
+		`(?i)_test`,
+		// If the pattern _test_ is in the string
+		// Ex. foo_test_baz
+		`(?i)_test?_`,
+	}
+)
+
 // IsTestFileOrPath will run various regex's against a target to determine if it is a test file or contained in a test directory.
 func IsTestFileOrPath(fullPath string) bool {
+	var r *regexp.Regexp
+	for _, pattern := range testPathRegex {
+		r = regexp.MustCompile(pattern)
+		if r.MatchString(fullPath) {
+			return true
+		}
+	}
+
 	fName := filepath.Base(fullPath)
-
-	// If the directory contains "test"
-	// Ex. foo/test/bar
-	r := regexp.MustCompile(`(?i)[/\\]test?[/\\]`)
-	if r.MatchString(fullPath) {
-		return true
+	for _, pattern := range testFileRegex {
+		r = regexp.MustCompile(pattern)
+		if r.MatchString(fName) {
+			return true
+		}
 	}
 
-	// If the directory starts with test, the leading slash gets dropped by default
-	// Ex. test/foo/bar
-	r = regexp.MustCompile(`(?i)test?[/\\]`)
-	if r.MatchString(fullPath) {
-		return true
-	}
-
-	// If the directory path starts with a different root but has the word test in it somewhere
-	// Ex. foo/test-secrets/bar
-	r = regexp.MustCompile(`/test.*/`)
-	if r.MatchString(fullPath) {
-		return true
-	}
-
-	// A the word Test is in the string, case sensitive
-	// Ex. ghTestlk
-	// Ex. Testllfhe
-	// Ex. Test
-	r = regexp.MustCompile(`Test`)
-	if r.MatchString(fName) {
-		return true
-	}
-
-	// A file has a suffix of _test
-	// Golang uses this as the default test file naming convention
-	//Ex. foo_test.go
-	r = regexp.MustCompile(`(?i)_test`)
-	if r.MatchString(fName) {
-		return true
-	}
-
-	// If the pattern _test_ is in the string
-	// Ex. foo_test_baz
-	r = regexp.MustCompile(`(?i)_test?_`)
-	return r.MatchString(fName)
+	return false
 }
 
 func MakeHomeDir(path string) (string, error) {
@@ -171,6 +125,22 @@ func MakeHomeDir(path string) (string, error) {
 	return dir, nil
 }
 
+// SetHomeDir will set the correct homedir.
+func SetHomeDir(h string) (string, error) {
+	for _, v := range []string{"$HOME", "~"} {
+		if strings.Contains(h, v) {
+			home, err := homedir.Dir()
+			if err != nil {
+				return "", err
+			}
+
+			h = strings.Replace(h, v, home, -1)
+		}
+	}
+
+	return h, nil
+}
+
 // WriteToFile will create a new file or truncate the existing one and write the input byte stream.
 func WriteToFile(path string, input []byte) error {
 	fh, err := os.Create(path)
@@ -179,7 +149,7 @@ func WriteToFile(path string, input []byte) error {
 	}
 	_, err = fh.Write(input)
 	if err != nil {
-		return fmt.Errorf("failed writing to configuration file, %w", err)
+		return fmt.Errorf("failed writing to file %q, %w", path, err)
 	}
 	return nil
 }
@@ -190,7 +160,7 @@ func CopyFiles(src, dest string) error {
 		return err
 	}
 
-	sigs, err := GetSignatureFiles(dest)
+	sigs, err := GetYamlFiles(dest)
 	if err != nil {
 		return err
 	}
@@ -204,22 +174,35 @@ func CopyFiles(src, dest string) error {
 	return nil
 }
 
-// GetSignatureFiles will find all the yaml files in the signatures directory
-func GetSignatureFiles(dir string) ([]string, error) {
+// GetYamlFiles will find all the yaml files in the provided directory path and return a string slice with all findings
+func GetYamlFiles(dir string) ([]string, error) {
 	files, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
 
 	var sigs []string
-	var ext string
+	var ext, fullPath string
 	for _, f := range files {
-		ext = filepath.Ext(dir + "/" + f.Name())
-		if ext == "yml" || ext == "yaml" {
-			sigs = append(sigs, fmt.Sprintf("%s/%s", dir, f.Name()))
+		fullPath = fmt.Sprintf("%s/%s", dir, f.Name())
+		ext = filepath.Ext(fullPath)
+		if ext == ".yml" || ext == ".yaml" {
+			sigs = append(sigs, fullPath)
 		}
 	}
+
 	return sigs, nil
+}
+
+var magicNumbers = [][]byte{
+	{0x1F, 0x8B, 0x08, 0x00},                         // GZip
+	{0x42, 0x5A, 0x68, 0x32},                         // BZip2
+	{0x50, 0x4B, 0x03, 0x04},                         // ZIP
+	{0x89, 0x50, 0x4E, 0x47},                         // PNG
+	{0x4D, 0x5A},                                     // Windows EXE
+	{0x7F, 'E', 'L', 'F'},                            // Linux ELF Executable
+	{0xFE, 0xED, 0xFA, 0xCE, 0xCE, 0xFA, 0xED, 0xFE}, // macOS Mach-O Binary
+	{0xFE, 0xED, 0xFA, 0xCF, 0x0C, 0x00, 0x00, 0x01}, // Mach-O 64-bit (x86_64)
 }
 
 func IsBinaryFile(filePath string) (bool, error) {

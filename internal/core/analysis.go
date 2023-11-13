@@ -246,8 +246,7 @@ func AnalyzeObject(ctx context.Context, sess *session.Session, change *object.Ch
 
 func isIgnoredFile(cfgScanTests bool, cfgMaxFileSize int64, fullFilePath string, mf matchfile.MatchFile, cfgSkippableExt, cfgSkippablePath []string) (bool, string) {
 	// Check if file exist before moving on
-	_, err := os.Stat(fullFilePath)
-	if err != nil {
+	if !util.PathExists(fullFilePath) {
 		return true, "file does not exist"
 	}
 
@@ -272,13 +271,12 @@ func isIgnoredFile(cfgScanTests bool, cfgMaxFileSize int64, fullFilePath string,
 
 	// Check the file size of the file. If it is greater than the default size then
 	// then we increment the ignored file count and pass on through.
-	yes, msg := util.IsMaxFileSize(fullFilePath, cfgMaxFileSize)
-	if yes {
+	if yes, msg := util.IsMaxFileSize(fullFilePath, cfgMaxFileSize); yes {
 		return true, msg
 	}
 
 	// Check if it is a binary file
-	yes, err = util.IsBinaryFile(fullFilePath)
+	yes, err := util.IsBinaryFile(fullFilePath)
 	if yes || err != nil {
 		return true, "is a binary file, ignoring"
 	}
@@ -286,6 +284,7 @@ func isIgnoredFile(cfgScanTests bool, cfgMaxFileSize int64, fullFilePath string,
 	if mf.IsSkippable(cfgSkippableExt, cfgSkippablePath) {
 		return true, "is skippable, ignoring"
 	}
+
 	return false, ""
 }
 
