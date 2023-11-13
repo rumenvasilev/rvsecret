@@ -63,8 +63,6 @@ func (st *State) AddRepository(repository *coreapi.Repository) {
 func (st *State) AddFinding(finding *finding.Finding) bool {
 	st.Lock()
 	defer st.Unlock()
-	// const MaxStrLen = 100
-	// st.Findings = append(st.Findings, finding)
 	// No need to append another finding of the same
 	// TODO perhaps make the rules that matched a list
 	if _, ok := st.Findings[finding.SecretID]; ok {
