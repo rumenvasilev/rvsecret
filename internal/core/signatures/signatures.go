@@ -300,7 +300,7 @@ func Discover(mf matchfile.MatchFile, change *object.Change, cfg *config.Config,
 	ignored = len(errors)
 	if ignored > 0 {
 		for k, v := range errors {
-			log.Log.Error("[Occurrences: %d]: %s", v, k)
+			log.Log.Debug("[Occurrences: %d]: %s", v, k)
 		}
 	}
 	return //dirtyFile, dirtyCommit, ignored, results
