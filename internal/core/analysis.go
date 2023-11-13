@@ -294,13 +294,16 @@ func generateFindings(sess *session.Session, data signatures.DiscoverOutput, tem
 	fin.Description = data.Sig.Description()
 	fin.LineNumber = strconv.Itoa(data.LineNum)
 	fin.SignatureID = data.Sig.SignatureID()
-	fin.SecretID = util.GenerateID()
+
+	// SecretID is used for dedup later under AddFinding()
+	params := []string{fin.RepositoryName, fin.FilePath, fin.LineNumber, fin.Content}
+	fin.SecretID = util.GenerateSecretIDWithParams(params...)
 
 	_ = fin.Initialize(sess.Config.Global.ScanType, sess.Config.Github.GithubEnterpriseURL)
 
 	// Add it to the session
-	sess.State.AddFinding(&fin)
-
-	// Print realtime data to stdout
-	fin.RealtimeOutput(sess.Config.Global)
+	if sess.State.AddFinding(&fin) {
+		// Print realtime data to stdout if finding was not a dup
+		fin.RealtimeOutput(sess.Config.Global)
+	}
 }

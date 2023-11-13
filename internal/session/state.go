@@ -11,7 +11,7 @@ import (
 type State struct {
 	*sync.Mutex
 	Stats        *stats.Stats
-	Findings     []*finding.Finding
+	Findings     map[string]*finding.Finding
 	Targets      []*coreapi.Owner
 	Repositories []*coreapi.Repository
 }
@@ -60,14 +60,25 @@ func (st *State) AddRepository(repository *coreapi.Repository) {
 
 // AddFinding will add a finding that has been discovered during a session to the list of findings
 // for that session
-func (st *State) AddFinding(finding *finding.Finding) {
+func (st *State) AddFinding(finding *finding.Finding) bool {
 	st.Lock()
 	defer st.Unlock()
 	// const MaxStrLen = 100
-	st.Findings = append(st.Findings, finding)
+	// st.Findings = append(st.Findings, finding)
+	// No need to append another finding of the same
+	// TODO perhaps make the rules that matched a list
+	if _, ok := st.Findings[finding.SecretID]; ok {
+		return false
+	}
+	st.Findings[finding.SecretID] = finding
 	st.Stats.IncrementFindingsTotal()
+	return true
 }
 
 func (st *State) GetFindings() []*finding.Finding {
-	return st.Findings
+	var res []*finding.Finding
+	for _, f := range st.Findings {
+		res = append(res, f)
+	}
+	return res
 }

@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/rumenvasilev/rvsecret/internal/log"
 )
 
 // Pluralize will take in a count and if the count is != 1 it will return the singular of the word.
@@ -59,6 +61,22 @@ func GenerateIDWithLen(i int) string {
 	if err != nil {
 		fmt.Println("Not able to generate finding ID: ", err)
 	}
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+func GenerateSecretIDWithParams(params ...string) string {
+	var str string
+	for _, p := range params {
+		str += p
+	}
+
+	h := sha1.New()
+	_, err := io.WriteString(h, str)
+	if err != nil {
+		log.Log.Error("unable to generate new secret id")
+		panic(fmt.Sprintf("unable to generate new secret id for string %s", str))
+	}
+
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 

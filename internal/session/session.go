@@ -9,6 +9,7 @@ import (
 	"github.com/google/go-github/github"
 	"github.com/rumenvasilev/rvsecret/internal/config"
 	coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
+	"github.com/rumenvasilev/rvsecret/internal/core/finding"
 	providerapi "github.com/rumenvasilev/rvsecret/internal/core/provider/api"
 	"github.com/rumenvasilev/rvsecret/internal/core/signatures"
 	"github.com/rumenvasilev/rvsecret/internal/log"
@@ -49,7 +50,7 @@ func initialize(cfg *config.Config) (*Session, error) {
 	s := new(Session).withConfig(cfg)
 
 	// init state
-	s.State = &State{Mutex: &sync.Mutex{}}
+	s.State = &State{Mutex: &sync.Mutex{}, Findings: make(map[string]*finding.Finding)}
 
 	// init threads
 	s.initThreads()
