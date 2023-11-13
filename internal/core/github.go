@@ -3,8 +3,10 @@ package core
 import (
 	"context"
 	"errors"
+	"net"
 	"regexp"
 	"strings"
+	"time"
 
 	_coreapi "github.com/rumenvasilev/rvsecret/internal/core/api"
 	"github.com/rumenvasilev/rvsecret/internal/log"
@@ -20,7 +22,18 @@ func GatherUserOrOrg(s *session.Session, targetList []string) {
 	for _, o := range targetList {
 		owner, err := s.Client.GetUserOrganization(ctx, o)
 		if err != nil {
-			// Should we not skip here?
+			var dnsErr *net.DNSError
+			if errors.As(err, &dnsErr) {
+				if dnsErr.IsNotFound {
+					log.Error("Encountered DNS resolution error: %s", err)
+					return
+				} else if dnsErr.Timeout() {
+					log.Error("DNS Timeout, will pause for 5 seconds")
+					// TODO replace time.Sleep with custom func, so it doesn't block and respond to context cancellation
+					time.Sleep(time.Duration(5 * time.Second))
+					continue
+				}
+			}
 			log.Error("Unable to collect user %s: %s", o, err)
 			continue
 		}
